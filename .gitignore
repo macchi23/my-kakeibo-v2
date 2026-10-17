@@ -1,0 +1,23 @@
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+.claude/logs/
+.claude/state/
+.DS_Store
+node_modules/
+dist/
+out/
+.next/
+cdk.out/
+*.tsbuildinfo
+backend/bin/
+coverage/
+cdk.context.json
+amplify_outputs.json
+.amplify/
+cdk-outputs*.json
+outputs.json
+
+# 非公開のメモ（別の private リポジトリ。handover・台帳・参照元）
+notes/

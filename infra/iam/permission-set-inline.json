@@ -1,0 +1,131 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyOutsideUsEast1",
+      "Effect": "Deny",
+      "Action": "*",
+      "Resource": "*",
+      "Condition": { "StringNotEquals": { "aws:RequestedRegion": "us-east-1" } }
+    },
+    {
+      "Sid": "CdkAssumeFilePublishingRole",
+      "Effect": "Allow",
+      "Action": ["sts:AssumeRole", "sts:TagSession"],
+      "Resource": "arn:aws:iam::*:role/cdk-kakeibov2-file-publishing-role-${aws:PrincipalAccount}-us-east-1"
+    },
+    {
+      "Sid": "CdkCreateChangeSetWithExecRole",
+      "Effect": "Allow",
+      "Action": "cloudformation:CreateChangeSet",
+      "Resource": "arn:aws:cloudformation:us-east-1:*:stack/MyKakeiboV2/*",
+      "Condition": {
+        "StringEquals": {
+          "cloudformation:RoleArn": "arn:aws:iam::${aws:PrincipalAccount}:role/cdk-kakeibov2-cfn-exec-role-${aws:PrincipalAccount}-us-east-1"
+        }
+      }
+    },
+    {
+      "Sid": "CdkOperateOwnStack",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:ExecuteChangeSet",
+        "cloudformation:DeleteChangeSet",
+        "cloudformation:RollbackStack",
+        "cloudformation:ContinueUpdateRollback",
+        "cloudformation:UpdateTerminationProtection",
+        "cloudformation:TagResource",
+        "cloudformation:UntagResource",
+        "cloudformation:Describe*",
+        "cloudformation:Get*",
+        "cloudformation:List*"
+      ],
+      "Resource": "arn:aws:cloudformation:us-east-1:*:stack/MyKakeiboV2/*"
+    },
+    {
+      "Sid": "CdkReadToolkitStack",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackEvents",
+        "cloudformation:GetTemplate"
+      ],
+      "Resource": "arn:aws:cloudformation:us-east-1:*:stack/CDKToolkit-my-kakeibo-v2/*"
+    },
+    {
+      "Sid": "CdkPassExecRoleToCfn",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/cdk-kakeibov2-cfn-exec-role-${aws:PrincipalAccount}-us-east-1",
+      "Condition": { "StringEquals": { "iam:PassedToService": "cloudformation.amazonaws.com" } }
+    },
+    {
+      "Sid": "CdkReadBootstrapVersion",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": "arn:aws:ssm:us-east-1:*:parameter/cdk-bootstrap/kakeibov2/version"
+    },
+    {
+      "Sid": "CdkReadStagingBucket",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket", "s3:GetBucketLocation", "s3:GetObject"],
+      "Resource": [
+        "arn:aws:s3:::cdk-kakeibov2-assets-${aws:PrincipalAccount}-us-east-1",
+        "arn:aws:s3:::cdk-kakeibov2-assets-${aws:PrincipalAccount}-us-east-1/*"
+      ]
+    },
+    {
+      "Sid": "ProjectSsmParameters",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:PutParameter",
+        "ssm:GetParameter",
+        "ssm:GetParameters",
+        "ssm:GetParametersByPath",
+        "ssm:GetParameterHistory",
+        "ssm:DeleteParameter",
+        "ssm:AddTagsToResource",
+        "ssm:RemoveTagsFromResource",
+        "ssm:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:ssm:us-east-1:*:parameter/my-kakeibo-v2",
+        "arn:aws:ssm:us-east-1:*:parameter/my-kakeibo-v2/*"
+      ]
+    },
+    {
+      "Sid": "CognitoAdminProjectPool",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:ListUsers",
+        "cognito-idp:AdminSetUserMFAPreference",
+        "cognito-idp:AdminResetUserPassword",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:AdminUserGlobalSignOut",
+        "cognito-idp:AdminDisableUser",
+        "cognito-idp:AdminEnableUser",
+        "cognito-idp:AdminDeleteUser",
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:ListUserPoolClients",
+        "cognito-idp:GetUserPoolMfaConfig"
+      ],
+      "Resource": "arn:aws:cognito-idp:us-east-1:*:userpool/*",
+      "Condition": { "StringEquals": { "aws:ResourceTag/Project": "my-kakeibo-v2" } }
+    },
+    {
+      "Sid": "ReadProjectBudget",
+      "Effect": "Allow",
+      "Action": "budgets:ViewBudget",
+      "Resource": "arn:aws:budgets::*:budget/my-kakeibo-v2-*"
+    },
+    {
+      "Sid": "FindTaggedResources",
+      "Effect": "Allow",
+      "Action": ["tag:GetResources", "tag:GetTagKeys", "tag:GetTagValues"],
+      "Resource": "*"
+    }
+  ]
+}

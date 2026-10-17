@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# NOTE: AWS の認証は使わない（cdk synth は環境非依存のスタックなので認証なしで通る）。デプロイはここに置かない
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # gitleaks で全履歴を見るため
+
+      - uses: actions/setup-go@v6
+        if: hashFiles('backend/go.mod') != ''
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install infra dependencies
+        if: hashFiles('infra/package-lock.json') != ''
+        working-directory: infra
+        run: npm ci
+
+      - name: Install web dependencies
+        if: hashFiles('web/package-lock.json') != ''
+        working-directory: web
+        run: npm ci
+
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+
+      - name: Check
+        run: scripts/check.sh all

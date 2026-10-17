@@ -1,0 +1,68 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyOutsideUsEast1",
+      "Effect": "Deny",
+      "Action": "*",
+      "Resource": "*",
+      "Condition": { "StringNotEquals": { "aws:RequestedRegion": "us-east-1" } }
+    },
+    {
+      "Sid": "ResolveDeployTimeParameters",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": [
+        "arn:aws:ssm:us-east-1:*:parameter/cdk-bootstrap/kakeibov2/version",
+        "arn:aws:ssm:us-east-1:*:parameter/my-kakeibo-v2/budget-email"
+      ]
+    },
+    {
+      "Sid": "CognitoCreateTaggedUserPool",
+      "Effect": "Allow",
+      "Action": "cognito-idp:CreateUserPool",
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:RequestTag/Project": "my-kakeibo-v2" } }
+    },
+    {
+      "Sid": "CognitoManageProjectUserPool",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:UpdateUserPool",
+        "cognito-idp:SetUserPoolMfaConfig",
+        "cognito-idp:GetUserPoolMfaConfig",
+        "cognito-idp:AddCustomAttributes",
+        "cognito-idp:ListTagsForResource",
+        "cognito-idp:TagResource",
+        "cognito-idp:UntagResource",
+        "cognito-idp:CreateUserPoolClient",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:UpdateUserPoolClient",
+        "cognito-idp:DeleteUserPoolClient",
+        "cognito-idp:ListUserPoolClients",
+        "cognito-idp:ListUserPoolClientSecrets"
+      ],
+      "Resource": "arn:aws:cognito-idp:us-east-1:*:userpool/*",
+      "Condition": { "StringEquals": { "aws:ResourceTag/Project": "my-kakeibo-v2" } }
+    },
+    {
+      "Sid": "BudgetsProjectBudget",
+      "Effect": "Allow",
+      "Action": [
+        "budgets:ModifyBudget",
+        "budgets:ViewBudget",
+        "budgets:TagResource",
+        "budgets:UntagResource",
+        "budgets:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:budgets::*:budget/my-kakeibo-v2-*"
+    },
+    {
+      "Sid": "BudgetsReadBillingView",
+      "Effect": "Allow",
+      "Action": "billing:GetBillingViewData",
+      "Resource": "arn:aws:billing::*:billingview/*"
+    }
+  ]
+}
