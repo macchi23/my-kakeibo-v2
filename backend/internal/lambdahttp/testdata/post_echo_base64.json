@@ -1,0 +1,26 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /echo/{id}",
+  "rawPath": "/echo/018f3b0a-0000-7000-8000-000000000000",
+  "rawQueryString": "",
+  "cookies": ["a=1", "b=2"],
+  "headers": {
+    "content-type": "application/json",
+    "x-test": "hello"
+  },
+  "requestContext": {
+    "routeKey": "POST /echo/{id}",
+    "stage": "$default",
+    "requestId": "example-request-id",
+    "apiId": "example",
+    "http": {
+      "method": "POST",
+      "path": "/echo/018f3b0a-0000-7000-8000-000000000000",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "192.0.2.1",
+      "userAgent": "example"
+    }
+  },
+  "body": "eyJuYW1lIjoi5Y+j5bqnIn0=",
+  "isBase64Encoded": true
+}

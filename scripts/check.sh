@@ -30,14 +30,27 @@ gofmt_clean() {
   [ -z "$out" ] || { echo "gofmt が必要なファイル:"; echo "$out"; return 1; }
 }
 
+# 開発用の認証（X-Dev-User でなりすませる）が本番の Lambda に入っていないことを確かめる
+lambda_without_devauth() {
+  local deps
+  deps=$(go list -deps ./cmd/lambda) || return 1
+  if grep -q '/internal/devauth$' <<<"$deps"; then
+    echo "cmd/lambda が internal/devauth に依存している"
+    return 1
+  fi
+}
+
 run_go() {
   if [ ! -f backend/go.mod ]; then echo "skip: go（backend/go.mod が無い）"; return; fi
   need go
   (
     cd backend || exit 2
     step gofmt gofmt_clean
+    step "go mod tidy" go mod tidy -diff
     step "go vet" go vet ./...
     step "go test" go test ./...
+    step "lambda without devauth" lambda_without_devauth
+    step "lambda arm64 build" env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -tags lambda.norpc -o /dev/null ./cmd/lambda
     [ ${#failed[@]} -eq 0 ]
   ) || failed+=("go")
 }

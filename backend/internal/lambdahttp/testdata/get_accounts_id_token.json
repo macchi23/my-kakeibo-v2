@@ -1,0 +1,32 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /accounts",
+  "rawPath": "/accounts",
+  "rawQueryString": "",
+  "headers": {
+    "accept": "application/json"
+  },
+  "requestContext": {
+    "routeKey": "GET /accounts",
+    "stage": "$default",
+    "requestId": "example-request-id",
+    "apiId": "example",
+    "http": {
+      "method": "GET",
+      "path": "/accounts",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "192.0.2.1",
+      "userAgent": "example"
+    },
+    "authorizer": {
+      "jwt": {
+        "claims": {
+          "sub": "user-a",
+          "token_use": "id"
+        },
+        "scopes": []
+      }
+    }
+  },
+  "isBase64Encoded": false
+}

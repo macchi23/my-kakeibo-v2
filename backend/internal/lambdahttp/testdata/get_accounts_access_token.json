@@ -1,0 +1,39 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /accounts",
+  "rawPath": "/accounts",
+  "rawQueryString": "includeArchived=true&q=%E9%A3%9F%E8%B2%BB",
+  "headers": {
+    "accept": "application/json",
+    "x-test": "a,b",
+    "user-agent": "example"
+  },
+  "queryStringParameters": {
+    "includeArchived": "true",
+    "q": "食費"
+  },
+  "requestContext": {
+    "routeKey": "GET /accounts",
+    "stage": "$default",
+    "requestId": "example-request-id",
+    "apiId": "example",
+    "http": {
+      "method": "GET",
+      "path": "/accounts",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "192.0.2.1",
+      "userAgent": "example"
+    },
+    "authorizer": {
+      "jwt": {
+        "claims": {
+          "sub": "user-a",
+          "token_use": "access",
+          "scope": "aws.cognito.signin.user.admin"
+        },
+        "scopes": ["aws.cognito.signin.user.admin"]
+      }
+    }
+  },
+  "isBase64Encoded": false
+}

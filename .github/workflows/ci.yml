@@ -13,6 +13,12 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Go の契約テスト（backend/internal/store）が使う DynamoDB Local。タグは固定する（latest は使わない）
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:3.3.2
+        ports:
+          - 8000:8000
     steps:
       - uses: actions/checkout@v6
         with:
@@ -45,5 +51,21 @@ jobs:
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             | sudo tar -xz -C /usr/local/bin gitleaks
 
-      - name: Check
-        run: scripts/check.sh all
+      # DynamoDB Local 用のダミーの値は Go のステップにだけ渡す（他のステップは AWS の認証を使わない）
+      - name: Check (go)
+        env:
+          DYNAMODB_ENDPOINT: http://localhost:8000
+          AWS_ACCESS_KEY_ID: dummy
+          AWS_SECRET_ACCESS_KEY: dummy
+          AWS_REGION: us-east-1
+        run: scripts/check.sh go
+
+      # go 以外は scripts/check.sh all と同じ対象を個別に実行する（go の二重実行を避けるため）
+      - name: Check (others)
+        if: ${{ !cancelled() }}
+        run: |
+          rc=0
+          for target in infra web shell hooks secrets; do
+            scripts/check.sh "$target" || rc=1
+          done
+          exit $rc
