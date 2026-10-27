@@ -6,12 +6,19 @@
       "Effect": "Deny",
       "Action": "*",
       "Resource": "*",
-      "Condition": { "StringNotEquals": { "aws:RequestedRegion": "us-east-1" } }
+      "Condition": {
+        "StringNotEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
     },
     {
       "Sid": "CdkAssumeFilePublishingRole",
       "Effect": "Allow",
-      "Action": ["sts:AssumeRole", "sts:TagSession"],
+      "Action": [
+        "sts:AssumeRole",
+        "sts:TagSession"
+      ],
       "Resource": "arn:aws:iam::*:role/cdk-kakeibov2-file-publishing-role-${aws:PrincipalAccount}-us-east-1"
     },
     {
@@ -57,18 +64,29 @@
       "Effect": "Allow",
       "Action": "iam:PassRole",
       "Resource": "arn:aws:iam::*:role/cdk-kakeibov2-cfn-exec-role-${aws:PrincipalAccount}-us-east-1",
-      "Condition": { "StringEquals": { "iam:PassedToService": "cloudformation.amazonaws.com" } }
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "cloudformation.amazonaws.com"
+        }
+      }
     },
     {
       "Sid": "CdkReadBootstrapVersion",
       "Effect": "Allow",
-      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
       "Resource": "arn:aws:ssm:us-east-1:*:parameter/cdk-bootstrap/kakeibov2/version"
     },
     {
       "Sid": "CdkReadStagingBucket",
       "Effect": "Allow",
-      "Action": ["s3:ListBucket", "s3:GetBucketLocation", "s3:GetObject"],
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:GetObject"
+      ],
       "Resource": [
         "arn:aws:s3:::cdk-kakeibov2-assets-${aws:PrincipalAccount}-us-east-1",
         "arn:aws:s3:::cdk-kakeibov2-assets-${aws:PrincipalAccount}-us-east-1/*"
@@ -113,7 +131,11 @@
         "cognito-idp:GetUserPoolMfaConfig"
       ],
       "Resource": "arn:aws:cognito-idp:us-east-1:*:userpool/*",
-      "Condition": { "StringEquals": { "aws:ResourceTag/Project": "my-kakeibo-v2" } }
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "my-kakeibo-v2"
+        }
+      }
     },
     {
       "Sid": "ReadProjectBudget",
@@ -124,8 +146,54 @@
     {
       "Sid": "FindTaggedResources",
       "Effect": "Allow",
-      "Action": ["tag:GetResources", "tag:GetTagKeys", "tag:GetTagValues"],
+      "Action": [
+        "tag:GetResources",
+        "tag:GetTagKeys",
+        "tag:GetTagValues"
+      ],
       "Resource": "*"
+    },
+    {
+      "Sid": "DebugTailProjectLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:FilterLogEvents",
+        "logs:GetLogEvents"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/my-kakeibo-v2-*"
+    },
+    {
+      "Sid": "DebugReadProjectFunction",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:GetPolicy",
+        "lambda:ListTags"
+      ],
+      "Resource": "arn:aws:lambda:us-east-1:*:function:my-kakeibo-v2-*"
+    },
+    {
+      "Sid": "DebugReadProjectTable",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:DescribeTable",
+        "dynamodb:GetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:*:table/my-kakeibo-v2-*"
+    },
+    {
+      "Sid": "DenyResourceImport",
+      "Effect": "Deny",
+      "Action": "cloudformation:CreateChangeSet",
+      "Resource": "*",
+      "Condition": {
+        "Null": {
+          "cloudformation:ImportResourceTypes": "false"
+        }
+      }
     }
   ]
 }

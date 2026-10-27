@@ -6,12 +6,19 @@
       "Effect": "Deny",
       "Action": "*",
       "Resource": "*",
-      "Condition": { "StringNotEquals": { "aws:RequestedRegion": "us-east-1" } }
+      "Condition": {
+        "StringNotEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
     },
     {
       "Sid": "ResolveDeployTimeParameters",
       "Effect": "Allow",
-      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
       "Resource": [
         "arn:aws:ssm:us-east-1:*:parameter/cdk-bootstrap/kakeibov2/version",
         "arn:aws:ssm:us-east-1:*:parameter/my-kakeibo-v2/budget-email"
@@ -22,7 +29,11 @@
       "Effect": "Allow",
       "Action": "cognito-idp:CreateUserPool",
       "Resource": "*",
-      "Condition": { "StringEquals": { "aws:RequestTag/Project": "my-kakeibo-v2" } }
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "my-kakeibo-v2"
+        }
+      }
     },
     {
       "Sid": "CognitoManageProjectUserPool",
@@ -44,7 +55,11 @@
         "cognito-idp:ListUserPoolClientSecrets"
       ],
       "Resource": "arn:aws:cognito-idp:us-east-1:*:userpool/*",
-      "Condition": { "StringEquals": { "aws:ResourceTag/Project": "my-kakeibo-v2" } }
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "my-kakeibo-v2"
+        }
+      }
     },
     {
       "Sid": "BudgetsProjectBudget",
@@ -63,6 +78,99 @@
       "Effect": "Allow",
       "Action": "billing:GetBillingViewData",
       "Resource": "arn:aws:billing::*:billingview/*"
+    },
+    {
+      "Sid": "IamManageProjectRoleWithBoundary",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:UpdateRole",
+        "iam:UpdateRoleDescription",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePermissionsBoundary"
+      ],
+      "Resource": "arn:aws:iam::*:role/my-kakeibo-v2/*",
+      "Condition": {
+        "ArnEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::${aws:PrincipalAccount}:policy/my-kakeibo-v2-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "IamAttachOnlyLambdaBasicExecution",
+      "Effect": "Allow",
+      "Action": "iam:AttachRolePolicy",
+      "Resource": "arn:aws:iam::*:role/my-kakeibo-v2/*",
+      "Condition": {
+        "ArnEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::${aws:PrincipalAccount}:policy/my-kakeibo-v2-boundary",
+          "iam:PolicyARN": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        }
+      }
+    },
+    {
+      "Sid": "IamReadAndTagProjectRole",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole*",
+        "iam:List*RolePolicies",
+        "iam:ListRoleTags",
+        "iam:TagRole",
+        "iam:UntagRole"
+      ],
+      "Resource": "arn:aws:iam::*:role/my-kakeibo-v2/*"
+    },
+    {
+      "Sid": "IamPassProjectRoleToLambdaOnly",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/my-kakeibo-v2/*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "lambda.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "DenyRoleWithoutProjectBoundary",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateRole",
+        "iam:PutRolePermissionsBoundary"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ArnNotEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::${aws:PrincipalAccount}:policy/my-kakeibo-v2-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "DenyBoundaryRemoval",
+      "Effect": "Deny",
+      "Action": "iam:DeleteRolePermissionsBoundary",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyProjectPolicyEdit",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreatePolicyVersion",
+        "iam:DeletePolicyVersion",
+        "iam:SetDefaultPolicyVersion",
+        "iam:DeletePolicy",
+        "iam:TagPolicy",
+        "iam:UntagPolicy"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:policy/my-kakeibo-v2-boundary",
+        "arn:aws:iam::*:policy/my-kakeibo-v2-cfn-exec",
+        "arn:aws:iam::*:policy/my-kakeibo-v2-cfn-exec-app"
+      ]
     }
   ]
 }

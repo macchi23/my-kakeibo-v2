@@ -1,0 +1,155 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyOutsideUsEast1",
+      "Effect": "Deny",
+      "Action": "*",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
+    },
+    {
+      "Sid": "CdkReadAssetsForLambda",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion"
+      ],
+      "Resource": "arn:aws:s3:::cdk-kakeibov2-assets-${aws:PrincipalAccount}-us-east-1/*"
+    },
+    {
+      "Sid": "LambdaCreateTaggedFunction",
+      "Effect": "Allow",
+      "Action": "lambda:CreateFunction",
+      "Resource": "arn:aws:lambda:us-east-1:*:function:my-kakeibo-v2-*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "my-kakeibo-v2"
+        }
+      }
+    },
+    {
+      "Sid": "LambdaManageProjectFunction",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetFunction*",
+        "lambda:GetRuntimeManagementConfig",
+        "lambda:GetPolicy",
+        "lambda:ListTags",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:PutFunctionConcurrency",
+        "lambda:DeleteFunctionConcurrency",
+        "lambda:RemovePermission",
+        "lambda:DeleteFunction"
+      ],
+      "Resource": "arn:aws:lambda:us-east-1:*:function:my-kakeibo-v2-*"
+    },
+    {
+      "Sid": "LambdaAllowInvokeFromApiGatewayOnly",
+      "Effect": "Allow",
+      "Action": "lambda:AddPermission",
+      "Resource": "arn:aws:lambda:us-east-1:*:function:my-kakeibo-v2-*",
+      "Condition": {
+        "StringEquals": {
+          "lambda:Principal": "apigateway.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "DynamoDbCreateTaggedTable",
+      "Effect": "Allow",
+      "Action": "dynamodb:CreateTable",
+      "Resource": "arn:aws:dynamodb:us-east-1:*:table/my-kakeibo-v2-*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "my-kakeibo-v2"
+        }
+      }
+    },
+    {
+      "Sid": "DynamoDbManageProjectTable",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:Describe*",
+        "dynamodb:UpdateTable",
+        "dynamodb:UpdateTimeToLive",
+        "dynamodb:UpdateContinuousBackups",
+        "dynamodb:GetResourcePolicy",
+        "dynamodb:ListTagsOfResource",
+        "dynamodb:TagResource",
+        "dynamodb:UntagResource"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:*:table/my-kakeibo-v2-*"
+    },
+    {
+      "Sid": "LogsCreateTaggedLogGroup",
+      "Effect": "Allow",
+      "Action": "logs:CreateLogGroup",
+      "Resource": "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/my-kakeibo-v2-*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "my-kakeibo-v2"
+        }
+      }
+    },
+    {
+      "Sid": "LogsManageProjectLogGroup",
+      "Effect": "Allow",
+      "Action": [
+        "logs:PutRetentionPolicy",
+        "logs:DeleteRetentionPolicy",
+        "logs:GetDataProtectionPolicy",
+        "logs:DeleteDataProtectionPolicy",
+        "logs:ListTagsForResource",
+        "logs:TagResource",
+        "logs:UntagResource",
+        "logs:DeleteLogGroup"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/my-kakeibo-v2-*"
+    },
+    {
+      "Sid": "LogsDescribeWithoutResourceLevel",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogGroups",
+        "logs:DescribeIndexPolicies",
+        "logs:DescribeResourcePolicies"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ApiGatewayCreateTaggedHttpApi",
+      "Effect": "Allow",
+      "Action": "apigateway:POST",
+      "Resource": "arn:aws:apigateway:us-east-1::/apis",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "my-kakeibo-v2"
+        }
+      }
+    },
+    {
+      "Sid": "ApiGatewayManageProjectHttpApi",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET",
+        "apigateway:POST",
+        "apigateway:PATCH",
+        "apigateway:DELETE"
+      ],
+      "Resource": "arn:aws:apigateway:us-east-1::/apis/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/Project": "my-kakeibo-v2"
+        }
+      }
+    }
+  ]
+}
