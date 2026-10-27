@@ -1,5 +1,5 @@
 個人用の家計簿アプリ。Go（Lambda, `provided.al2023` arm64）+ API Gateway HTTP API + DynamoDB + Cognito / CDK（TypeScript）/ Next.js（静的書き出し）+ Amplify Hosting。リージョンは us-east-1。
-目的は Go の学習（ユーザーは Go 未経験）。GitHub で公開し、Qiita 連載も書く。
+目的は Go の学習（ユーザーは Go 未経験）。GitHub で公開し、Zenn 連載も書く。
 
 作業を始める前に読む:
 
@@ -10,7 +10,7 @@
 | `docs/DECISIONS.md` | 設計を変えたくなったとき、新しい領域に入るとき |
 | `docs/go/README.md` | Go のコードに触れるとき |
 | `docs/LLM.md` | Bedrock / jev に触れる前（P3 で作る） |
-| `docs/article-series.md` | Qiita の記事を書くとき |
+| `docs/article-series.md` | Zenn の記事を書くとき |
 
 ## 必須ルール
 
