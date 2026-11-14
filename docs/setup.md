@@ -184,4 +184,3 @@ AccessDenied が出たとき: スタックイベントで拒否された操作�
 | `scripts/check.sh` | 品質チェック |
 | `.claude/` | エージェント・スキル・hook |
 | `docs/go/` | Go の学習資料と進捗 |
-| `docs/articles/` | Zenn の下書き |

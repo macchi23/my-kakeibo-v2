@@ -10,7 +10,7 @@
 | `docs/DECISIONS.md` | 設計を変えたくなったとき、新しい領域に入るとき |
 | `docs/go/README.md` | Go のコードに触れるとき |
 | `docs/LLM.md` | Bedrock / jev に触れる前（P3 で作る） |
-| `docs/article-series.md` | Zenn の記事を書くとき |
+| `~/my-playground/zenn-content/series/kakeibo-v2.md` | Zenn の記事を書くとき（非公開の別リポジトリ。運用は同リポジトリの `README.md`） |
 
 ## 必須ルール
 
