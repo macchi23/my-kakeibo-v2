@@ -94,6 +94,18 @@ describe.each(files)('infra/iam/%s', (f) => {
     const sids = docs[f].Statement.map((s) => s.Sid);
     expect(new Set(sids).size).toBe(sids.length);
   });
+
+  // validate-policy は通るのに、CreatePolicyVersion が "failed legacy parsing" で拒否した（2026-11-15）
+  it('Arn* 演算子の値にポリシー変数を使わない', () => {
+    for (const s of docs[f].Statement) {
+      for (const [op, kv] of Object.entries(s.Condition ?? {})) {
+        if (!/(^|:)Arn/.test(op)) continue;
+        for (const v of Object.values(kv).flatMap(list)) {
+          expect(v, `${s.Sid}: ${op}`).not.toContain('${');
+        }
+      }
+    }
+  });
 });
 
 describe('管理ポリシー', () => {
@@ -169,7 +181,7 @@ describe('IAM の囲い', () => {
       expect.arrayContaining(['iam:CreateRole', 'iam:PutRolePermissionsBoundary']),
     );
     expect(stmt('DenyRoleWithoutProjectBoundary')?.Resource).toBe('*');
-    expect(stmt('DenyRoleWithoutProjectBoundary')?.Condition).toEqual({ ArnNotEquals: { 'iam:PermissionsBoundary': BOUNDARY_ARN } });
+    expect(stmt('DenyRoleWithoutProjectBoundary')?.Condition).toEqual({ StringNotEquals: { 'iam:PermissionsBoundary': BOUNDARY_ARN } });
     expect(stmt('DenyBoundaryRemoval')?.Action).toBe('iam:DeleteRolePermissionsBoundary');
     const edit = stmt('DenyProjectPolicyEdit');
     expect(edit?.Effect).toBe('Deny');
@@ -191,7 +203,7 @@ describe('IAM の囲い', () => {
     expect(roleStmts.length).toBeGreaterThan(0);
     for (const s of roleStmts) {
       expect(s.Resource, s.Sid).toBe(ROLE_ARN);
-      expect(s.Condition?.ArnEquals?.['iam:PermissionsBoundary'], s.Sid).toBe(BOUNDARY_ARN);
+      expect(s.Condition?.StringEquals?.['iam:PermissionsBoundary'], s.Sid).toBe(BOUNDARY_ARN);
     }
   });
 

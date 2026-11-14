@@ -95,7 +95,7 @@
       ],
       "Resource": "arn:aws:iam::*:role/my-kakeibo-v2/*",
       "Condition": {
-        "ArnEquals": {
+        "StringEquals": {
           "iam:PermissionsBoundary": "arn:aws:iam::${aws:PrincipalAccount}:policy/my-kakeibo-v2-boundary"
         }
       }
@@ -106,8 +106,10 @@
       "Action": "iam:AttachRolePolicy",
       "Resource": "arn:aws:iam::*:role/my-kakeibo-v2/*",
       "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::${aws:PrincipalAccount}:policy/my-kakeibo-v2-boundary"
+        },
         "ArnEquals": {
-          "iam:PermissionsBoundary": "arn:aws:iam::${aws:PrincipalAccount}:policy/my-kakeibo-v2-boundary",
           "iam:PolicyARN": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
         }
       }
@@ -144,7 +146,7 @@
       ],
       "Resource": "*",
       "Condition": {
-        "ArnNotEquals": {
+        "StringNotEquals": {
           "iam:PermissionsBoundary": "arn:aws:iam::${aws:PrincipalAccount}:policy/my-kakeibo-v2-boundary"
         }
       }

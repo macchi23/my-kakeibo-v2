@@ -14,6 +14,7 @@ JSON が CDK の実体（定数・リソース型）と食い違わないこと�
 ## 書き方の規則
 
 - ARN のアカウント欄には IAM ポリシー変数を書けない（変数はリソース部分と Condition の値だけ）。アカウント欄は `*` にし、アカウントの限定はロール名・バケット名の中の `${aws:PrincipalAccount}` で行う
+- 条件で ARN を変数入りで比べるときは `StringEquals` / `StringNotEquals` を使う。`ArnEquals` などの `Arn*` 演算子の値に変数を入れると、`validate-policy` は通るのに IAM の作成・更新 API が "failed legacy parsing" で拒否する（テストが検出する）
 - 実アカウント ID は書かない（テストが 12 桁の数字を検出する）
 - Allow に `*` や `<service>:*` を使わない
 - 管理ポリシーは 1 本 6,144 文字（空白を除く）まで。cfn-exec が収まらなくなったので 2 本に分けた。足すときは `-cfn-exec` に IAM と Deny、`-cfn-exec-app` にアプリのリソースを置く。テストが上限を確かめる
