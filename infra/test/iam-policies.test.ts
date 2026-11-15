@@ -1,3 +1,5 @@
+// infra/iam/ の IAM ポリシー（JSON）の検査。JSON にはコメントを書けないので、意図はここに書く。
+// 最小権限（広いワイルドカードが無い・プロジェクトのリソースに限る）と、コード側の定数との整合を確かめる。
 import { readFileSync } from 'node:fs';
 import { Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
@@ -14,6 +16,7 @@ import {
   TOOLKIT_STACK_NAME,
 } from '../lib/project-constants';
 
+// infra/iam/*.json の 4 つのポリシーを読み込み、パース済みの docs と生文字列の raw を作る。
 const read = (name: string) => readFileSync(new URL(`../iam/${name}`, import.meta.url), 'utf-8');
 const files = ['cfn-exec-policy.json', 'cfn-exec-app-policy.json', 'boundary-policy.json', 'permission-set-inline.json'] as const;
 const managed = ['cfn-exec-policy.json', 'cfn-exec-app-policy.json', 'boundary-policy.json'] as const;
@@ -23,6 +26,7 @@ const docs: Record<string, { Version: string; Statement: Statement[] }> = Object
   files.map((f) => [f, JSON.parse(raw[f])]),
 );
 
+// ポリシーの Statement 1 つ分の型（テストで使うフィールドだけ）。
 interface Statement {
   Sid: string;
   Effect: 'Allow' | 'Deny';
@@ -31,6 +35,7 @@ interface Statement {
   Condition?: Record<string, Record<string, string | string[]>>;
 }
 
+// 以降は、Statement を調べるための小さな補助関数（許可の取り出し・ワイルドカードの照合・タグ条件の判定など）。
 const list = (v: string | string[]) => (Array.isArray(v) ? v : [v]);
 const resourcesOf = (f: string) => docs[f].Statement.flatMap((s) => list(s.Resource));
 const conditionValues = (f: string) =>
@@ -72,6 +77,7 @@ const scopedToProject = (s: Statement) => {
 };
 const hasProjectTagCondition = (s: Statement) => isTagValue(s, 'aws:ResourceTag/Project') || isTagValue(s, 'aws:RequestTag/Project');
 
+// 本番スタックが作るリソースの型が、CFN 実行ロールのポリシーで許可されている型の範囲内であること。
 describe('本番スタックのリソース型', () => {
   it('cfn-exec-policy.json が許可しているリソース型だけを使う', () => {
     const { stack } = createApp({ context: testContext() });
@@ -98,6 +104,7 @@ describe('本番スタックのリソース型', () => {
   });
 });
 
+// 全ポリシーに共通の基本チェック（形式・アカウント ID の混入・ワイルドカード・Sid の重複）。
 describe.each(files)('infra/iam/%s', (f) => {
   it('JSON として読め、Version が 2012-10-17', () => {
     expect(docs[f].Version).toBe('2012-10-17');
@@ -134,6 +141,7 @@ describe.each(files)('infra/iam/%s', (f) => {
   });
 });
 
+// 管理ポリシーの文字数上限と、us-east-1 以外の Deny。
 describe('管理ポリシー', () => {
   it.each(managed)('%s は空白を除いて 6,144 文字以下（管理ポリシーの上限）', (f) => {
     expect(stripSpaces(raw[f]).length).toBeLessThanOrEqual(6144);
@@ -148,6 +156,7 @@ describe('管理ポリシー', () => {
   });
 });
 
+// Resource が * の Allow を、理由のあるものだけに限る（増えたらテストが落ちて気づける）。
 describe('Resource "*" の Allow は許可リストだけ', () => {
   const wildcardOk: Record<string, string[]> = {
     'cfn-exec-policy.json': ['CognitoCreateTaggedUserPool'],
@@ -163,6 +172,7 @@ describe('Resource "*" の Allow は許可リストだけ', () => {
   });
 });
 
+// タグ条件の判定関数（scopedToProject）自体が、通すべきものを通し、弾くべきものを弾くこと。
 describe('scopedToProject の判定', () => {
   const base = { Sid: 'x', Effect: 'Allow' as const };
   it.each([
@@ -192,6 +202,7 @@ describe('scopedToProject の判定', () => {
   });
 });
 
+// ステージ作成時のタグ付け許可が、決めた形のまま変わっていないこと。
 describe('ApiGatewayTagProjectStage', () => {
   // apigateway:TagResource は Service Reference の Actions に無いが、Stage の作成時に実際に評価された（2026-11-15）
   const s = docs['cfn-exec-app-policy.json'].Statement.find((x) => x.Sid === 'ApiGatewayTagProjectStage');
@@ -208,6 +219,7 @@ describe('ApiGatewayTagProjectStage', () => {
   });
 });
 
+// HTTP API の ID を埋め込む許可が、自 API だけに効き、他の API には効かないこと。
 describe('cfn-exec-app-policy.json の API ID（ステージの操作は自 API に固定）', () => {
   const f = 'cfn-exec-app-policy.json';
   const apiPrefix = 'arn:aws:apigateway:us-east-1::/apis/';
@@ -319,6 +331,7 @@ describe('cfn-exec-app-policy.json の API ID（ステージの操作は自 API 
   });
 });
 
+// Allow の対象が、このプロジェクトのリソース（名前かタグ条件）だけに限られること。
 describe('Allow の Resource がプロジェクトのものに限られる', () => {
   // 請求ビューは名前を持たず、Budget のハンドラーが要求する
   const noProjectResource = new Set(['BudgetsReadBillingView']);
@@ -335,6 +348,7 @@ describe('Allow の Resource がプロジェクトのものに限られる', () 
   });
 });
 
+// IAM ロールの作成・操作が、path と boundary の条件で囲われていること。
 describe('IAM の囲い', () => {
   const doc = 'cfn-exec-policy.json';
   const stmt = (sid: string) => docs[doc].Statement.find((s) => s.Sid === sid);
@@ -387,6 +401,7 @@ describe('IAM の囲い', () => {
 
 });
 
+// 持たせてはいけない権限（削除系・広すぎる権限など）が、どのポリシーにも無いこと。
 describe('許可してはいけない操作', () => {
   // Allow の Action はワイルドカード（dynamodb:Delete* など）を展開して判定する
   const banned = [
@@ -428,6 +443,7 @@ describe('許可してはいけない操作', () => {
   });
 });
 
+// 権限セットのインラインポリシー固有の確認。
 describe('permission-set-inline.json', () => {
   it('deploy-role / lookup-role を引き受けさせない', () => {
     expect(raw['permission-set-inline.json']).not.toContain('deploy-role');
@@ -435,6 +451,7 @@ describe('permission-set-inline.json', () => {
   });
 });
 
+// ポリシー中の名前・ID・タグ値が、infra/lib/project-constants.ts の定数と一致していること。
 describe.each(files)('定数との整合: %s', (f) => {
   it('ARN 中の bootstrap qualifier が BOOTSTRAP_QUALIFIER', () => {
     const quals = new Set<string>();
@@ -472,6 +489,7 @@ describe.each(files)('定数との整合: %s', (f) => {
   });
 });
 
+// SSM パラメータ名の許可が定数と一致していること。
 describe('cfn-exec-policy.json の SSM', () => {
   it('budget-email のパラメータ名が BUDGET_EMAIL_PARAMETER', () => {
     const arns = resourcesOf('cfn-exec-policy.json').filter((r) => r.includes(':parameter/my-kakeibo-v2/'));
@@ -479,6 +497,7 @@ describe('cfn-exec-policy.json の SSM', () => {
   });
 });
 
+// 手順書に、権限の迂回になる書き方が残っていないこと。
 describe('docs/setup.md', () => {
   // cfn-exec-app の JSON を版の更新に直接渡すと、プレースホルダーのまま反映される（ID を埋めるスクリプトを使う）
   it('cfn-exec-app を create-policy-version に直接渡す記述が無い', () => {

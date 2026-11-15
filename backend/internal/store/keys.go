@@ -24,11 +24,13 @@ func userPK(u kakeibo.UserID) string {
 	panic("TODO(L5)")
 }
 
+// accountSK は口座の SK（ACCOUNT#{id}）を組む。
 func accountSK(id string) string {
 	// TODO(L5)
 	panic("TODO(L5)")
 }
 
+// categorySK はカテゴリの SK（CATEGORY#{id}）を組む。
 func categorySK(id string) string {
 	// TODO(L5)
 	panic("TODO(L5)")

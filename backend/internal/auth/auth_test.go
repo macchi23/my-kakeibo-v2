@@ -10,6 +10,7 @@ import (
 	"github.com/macchi23/my-kakeibo-v2/backend/internal/kakeibo"
 )
 
+// UserID を載せて取り出せること、載せていない・空のときは ok=false になることを確かめる。
 func TestUserIDContext(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -25,6 +26,7 @@ func TestUserIDContext(t *testing.T) {
 	}
 }
 
+// claims の載せ外しが往復できることを確かめる。
 func TestClaimsContext(t *testing.T) {
 	t.Skip("TODO(L4): 実装したらこの行を消す")
 
@@ -38,6 +40,7 @@ func TestClaimsContext(t *testing.T) {
 	}
 }
 
+// claims の条件（sub・token_use）ごとに、401 で止まるか next に UserID が渡るかを確かめる。
 func TestRequireJWT(t *testing.T) {
 	t.Skip("TODO(L4): 実装したらこの行を消す")
 

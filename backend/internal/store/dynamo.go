@@ -49,26 +49,32 @@ func NewDynamo(c dynamoAPI, table string) *Dynamo {
 }
 
 // 変換: ドメインの型 <-> 保存用の型。PK / SK / Type / UserID はここで埋める（userPK / accountSK を使う）。
+// newAccountItem はドメインの口座を、DynamoDB に保存する形（accountItem）にする。
 func newAccountItem(user kakeibo.UserID, a kakeibo.Account) accountItem {
 	// TODO(L5)
 	panic("TODO(L5)")
 }
 
+// toAccount は保存用の形から、ドメインの口座に戻す。キー属性（PK / SK など）は捨てる。
 func (it accountItem) toAccount() kakeibo.Account {
 	// TODO(L5)
 	panic("TODO(L5)")
 }
 
+// newCategoryItem は newAccountItem のカテゴリ版。
 func newCategoryItem(user kakeibo.UserID, c kakeibo.Category) categoryItem {
 	// TODO(L5)
 	panic("TODO(L5)")
 }
 
+// toCategory は toAccount のカテゴリ版。
 func (it categoryItem) toCategory() kakeibo.Category {
 	// TODO(L5)
 	panic("TODO(L5)")
 }
 
+// ここから下は、口座・カテゴリそれぞれの一覧・取得・作成・更新（契約は Dynamo の説明のとおり）。
+// ListAccounts は PK = 自分のユーザー、SK が ACCOUNT# で始まる項目を全件返す。
 func (d *Dynamo) ListAccounts(ctx context.Context, user kakeibo.UserID) ([]kakeibo.Account, error) {
 	// TODO(L5): Query（ConsistentRead: aws.Bool(true) 必須。理由は Dynamo の説明を参照）（begins_with(SK, accountSKPrefix)）→ ページングを回す → attributevalue.UnmarshalListOfMaps → toAccount。
 	//   ヒント: dynamodb.NewQueryPaginator が使える。ExpressionAttributeValues は map[string]types.AttributeValue
@@ -76,12 +82,14 @@ func (d *Dynamo) ListAccounts(ctx context.Context, user kakeibo.UserID) ([]kakei
 	panic("TODO(L5)")
 }
 
+// GetAccount は PK と SK を指定して 1 件取る。無ければ ErrNotFound。
 func (d *Dynamo) GetAccount(ctx context.Context, user kakeibo.UserID, id string) (kakeibo.Account, error) {
 	// TODO(L5): GetItem（ConsistentRead: aws.Bool(true) 必須）の Key に PK と SK を入れる。out.Item が空なら ErrNotFound。UnmarshalMap で accountItem に。
 	//   ヒント: Key は map[string]types.AttributeValue。文字列 2 つなので自分で組んでも attributevalue.MarshalMap でもよい
 	panic("TODO(L5)")
 }
 
+// CreateAccount は新規作成のみ許す条件付きの PutItem。
 func (d *Dynamo) CreateAccount(ctx context.Context, user kakeibo.UserID, a kakeibo.Account) error {
 	// TODO(L5): MarshalMap(newAccountItem(...)) → PutItem + ConditionExpression "attribute_not_exists(PK)"。
 	//   ConditionalCheckFailed は errors.As(err, &ccf)（var ccf *types.ConditionalCheckFailedException）で判別して、
@@ -89,12 +97,14 @@ func (d *Dynamo) CreateAccount(ctx context.Context, user kakeibo.UserID, a kakei
 	panic("TODO(L5)")
 }
 
+// UpdateAccount は既存の項目だけを置き換える条件付きの書き込み。
 func (d *Dynamo) UpdateAccount(ctx context.Context, user kakeibo.UserID, a kakeibo.Account) error {
 	// TODO(L5): 項目全体を置き換える。PutItem + "attribute_exists(PK)" が最も簡単（UpdateItem + SET 式でもよい。条件は必須）。
 	//   ConditionalCheckFailed は kakeibo.ErrNotFound に変える。それ以外のエラーは %w で包んで返す。
 	panic("TODO(L5)")
 }
 
+// カテゴリの 4 メソッドは、口座と同じ処理を SK の prefix（CATEGORY#）と型だけ変えて行う。
 func (d *Dynamo) ListCategories(ctx context.Context, user kakeibo.UserID) ([]kakeibo.Category, error) {
 	// TODO(L5): ListAccounts と同じ要領（SK の prefix が違う）。共通部分をヘルパーに切り出してよい。
 	panic("TODO(L5)")

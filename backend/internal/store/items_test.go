@@ -37,6 +37,7 @@ func TestNewAccountItem(t *testing.T) {
 	}
 }
 
+// カテゴリでも、キー・type・userId が埋まり、往復で値が変わらないことを確かめる。
 func TestNewCategoryItem(t *testing.T) {
 	t.Skip("TODO(L5): 実装したらこの行を消す")
 

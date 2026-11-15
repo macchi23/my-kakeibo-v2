@@ -9,12 +9,14 @@ REPO=$(pwd)
 SCRIPT_PATH=scripts/apply-cfn-exec-app-policy.sh
 POLICY_PATH=infra/iam/cfn-exec-app-policy.json
 
+# 前提のツールの確認と、使うコマンドの場所の記録。偽の aws だけを見せる環境（env -i）でも jq と git は使えるようにするため。
 command -v jq >/dev/null 2>&1 || { echo "jq が見つからない" >&2; exit 2; }
 command -v git >/dev/null 2>&1 || { echo "git が見つからない" >&2; exit 2; }
 command -v python3 >/dev/null 2>&1 || { echo "python3 が見つからない（端末の確認のテストに使う）" >&2; exit 2; }
 JQ_DIR=$(dirname "$(command -v jq)")
 GIT_DIR_BIN=$(dirname "$(command -v git)")
 
+# 作業用の一時ディレクトリを作る（終了時に消す）。偽の aws・空の AWS 設定・ログの置き場にする。
 work=$(mktemp -d) || exit 2
 [ -d "$work" ] || exit 2
 trap 'rm -rf "$work"' EXIT
@@ -247,6 +249,7 @@ run() {
 }
 
 POSTCHECK=created_matches_origin
+# ここから各ケースを実行する。run の引数の意味は run の定義の上のコメントを参照。
 run "正常系: --apply（端末で y）は origin の main の JSON に ID を埋めて反映する" ok yes "" tty y -- --apply
 run "正常系: dry-run は create-policy-version を呼ばず、差分を表示する" ok no "" notty "" --
 run "正常系: Document が URL エンコードで返っても確認できる" ok yes "" tty y FAKE_GET_ENCODED=1 -- --apply

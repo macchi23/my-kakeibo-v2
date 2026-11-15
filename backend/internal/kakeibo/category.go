@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 )
 
+// CategoryKind はカテゴリの種類（支出・収入）。AccountKind と同じく、string ベースの独自型で列挙を代用する。
 type CategoryKind string
 
 const (
@@ -16,6 +17,7 @@ const (
 	CategoryKindIncome  CategoryKind = "INCOME"
 )
 
+// カテゴリ名・説明の長さの範囲（rune 数）と、jev に渡せる選択肢の上限。
 const (
 	CategoryNameMin        = 1
 	CategoryNameMax        = 50
@@ -37,6 +39,7 @@ type Category struct {
 	UpdatedAt   time.Time    `json:"updatedAt"`
 }
 
+// CategoryInput はクライアントから受け取る入力。AccountInput と同じく ID やユーザー ID は持たせない。
 type CategoryInput struct {
 	Name        string       `json:"name"`
 	Kind        CategoryKind `json:"kind"`
@@ -60,9 +63,10 @@ func (k CategoryKind) IsValid() bool {
 //   - description: 0〜200 文字（rune 数）
 //   - kind: EXPENSE か INCOME
 func (in CategoryInput) Validate() error {
-	// TODO(L1): AccountInput.Validate と同じ要領で書く。
+	// 名前と説明を rune 数で数える（前後の空白は除く）。
 	nameRune := utf8.RuneCountInString(strings.TrimSpace(in.Name))
 	descriptionRune := utf8.RuneCountInString(strings.TrimSpace(in.Description))
+	// 名前・説明・種類の順に、範囲外なら最初の違反を ValidationError で返す。
 	if nameRune < CategoryNameMin || nameRune > CategoryNameMax {
 		return ValidationError{Field: "name", Message: "カテゴリ名は1-50文字にしてください"}
 	}
@@ -85,7 +89,6 @@ func (in CategoryInput) Validate() error {
 // 違反は ValidationError（重複は Field "name"、件数超過は Field "kind"）で返す。
 // NOTE: 検査と書き込みの間は原子的ではない（同時に 2 件作ると重複しうる）。個人用なので P1 では許容する。
 func CheckCategoryConstraints(existing []Category, c Category) error {
-	// TODO(L1): existing を range で回して、上の 3 つを検査する。
 	// c がアーカイブ済み（ArchivedAt != nil）なら、制約の対象外なので nil を返す
 	if c.ArchivedAt != nil {
 		return nil
@@ -117,7 +120,7 @@ func CheckCategoryConstraints(existing []Category, c Category) error {
 // CheckKindUnchanged は更新で kind を変えようとしていないか検査する。変えようとしたら ValidationError（Field "kind"）。
 // current は保存済みのカテゴリ、in は更新リクエストの入力。
 func CheckKindUnchanged(current Category, in CategoryInput) error {
-	// TODO(L1): current.Kind と in.Kind を比べる。
+	// 保存済みの種類と入力の種類が違えば拒否する。
 	if current.Kind != in.Kind {
 		return ValidationError{Field: "kind", Message: "カテゴリの種類（支出・収入）は変更できません"}
 	}

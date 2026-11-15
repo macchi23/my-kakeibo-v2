@@ -47,12 +47,14 @@ var (
 	_ contractStore = (*store.Dynamo)(nil)
 )
 
+// インメモリのストアを契約テストに通す。
 func TestContractMemory(t *testing.T) {
 	t.Skip("TODO(L2): 実装したらこの行を消す")
 
 	runContract(t, func(t *testing.T) contractStore { return store.NewMemory() })
 }
 
+// DynamoDB のストアを契約テストに通す。接続先は DynamoDB Local に限る。
 func TestContractDynamo(t *testing.T) {
 	t.Skip("TODO(L5): 実装したらこの行を消す")
 
@@ -118,6 +120,7 @@ type ops[T any] struct {
 	setArchived func(v T, at *time.Time) T
 }
 
+// accountOps は口座のメソッドを ops にまとめ、itemContract が口座・カテゴリを同じ手順で試せるようにする。
 func accountOps(s contractStore) ops[kakeibo.Account] {
 	return ops[kakeibo.Account]{
 		list:   s.ListAccounts,
@@ -136,6 +139,7 @@ func accountOps(s contractStore) ops[kakeibo.Account] {
 	}
 }
 
+// categoryOps は accountOps のカテゴリ版。
 func categoryOps(s contractStore) ops[kakeibo.Category] {
 	return ops[kakeibo.Category]{
 		list:   s.ListCategories,
@@ -154,6 +158,7 @@ func categoryOps(s contractStore) ops[kakeibo.Category] {
 	}
 }
 
+// runContract は口座・カテゴリそれぞれの契約と、両者が混ざらないことを、テストごとに新しいストアで確かめる。
 func runContract(t *testing.T, newStore func(t *testing.T) contractStore) {
 	t.Run("口座", func(t *testing.T) {
 		itemContract(t, func(t *testing.T) ops[kakeibo.Account] { return accountOps(newStore(t)) })
@@ -197,6 +202,7 @@ func jsonEq[T any](t *testing.T, got, want T) {
 	}
 }
 
+// wantNotFound は err が ErrNotFound であることを確かめる。
 func wantNotFound(t *testing.T, err error) {
 	t.Helper()
 	if !errors.Is(err, kakeibo.ErrNotFound) {
@@ -204,6 +210,8 @@ func wantNotFound(t *testing.T, err error) {
 	}
 }
 
+// itemContract は 1 種類の項目について、作成・取得・更新・一覧・ユーザー間の分離などの契約を確かめる。
+// 型パラメータ T で口座とカテゴリの両方に使い回す。
 func itemContract[T any](t *testing.T, newOps func(t *testing.T) ops[T]) {
 	ctx := context.Background()
 
@@ -434,4 +442,5 @@ func itemContract[T any](t *testing.T, newOps func(t *testing.T) ops[T]) {
 	})
 }
 
+// ptr は値のポインタを返す（リテラルには & を付けられないため）。
 func ptr[T any](v T) *T { return &v }

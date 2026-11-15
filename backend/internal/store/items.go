@@ -17,6 +17,8 @@ const (
 	itemTypeCategory = "CATEGORY"
 )
 
+// accountItem は口座の保存用の形。`dynamodbav:"..."` が DynamoDB 上の属性名（JSON タグの DynamoDB 版）。
+// PK / SK はキー属性で、ドメインの Account には無い。
 type accountItem struct {
 	PK             string              `dynamodbav:"PK"`
 	SK             string              `dynamodbav:"SK"`
@@ -32,6 +34,7 @@ type accountItem struct {
 	UpdatedAt      time.Time           `dynamodbav:"updatedAt"`
 }
 
+// categoryItem はカテゴリの保存用の形。構成は accountItem と同じ。
 type categoryItem struct {
 	PK          string               `dynamodbav:"PK"`
 	SK          string               `dynamodbav:"SK"`

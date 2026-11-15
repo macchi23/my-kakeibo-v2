@@ -16,6 +16,7 @@ import (
 
 // これらのテスト（L6）は、auth の context.go（WithClaims は L4）と jwt.go（L4）が動いている前提（claims の往復を確かめるため）。
 
+// loadEvent は testdata の JSON ファイルから API Gateway のイベントを読み込む。
 func loadEvent(t *testing.T, name string) events.APIGatewayV2HTTPRequest {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", name))
@@ -29,6 +30,7 @@ func loadEvent(t *testing.T, name string) events.APIGatewayV2HTTPRequest {
 	return ev
 }
 
+// invoke は Wrap したハンドラーにイベントを渡し、error を返さないことも確かめてレスポンスを返す。
 func invoke(t *testing.T, h http.Handler, ev events.APIGatewayV2HTTPRequest) events.APIGatewayV2HTTPResponse {
 	t.Helper()
 	resp, err := Wrap(h)(context.Background(), ev)
@@ -95,6 +97,7 @@ func echoHandler() http.Handler {
 	return mux
 }
 
+// イベントが http.Request に正しく変換され、ハンドラーの出力がレスポンスに戻ることを、サンプルイベントごとに確かめる。
 func TestWrapRoundTrip(t *testing.T) {
 	t.Skip("TODO(L6): 実装したらこの行を消す")
 
@@ -174,6 +177,7 @@ func TestWrapRoundTrip(t *testing.T) {
 	}
 }
 
+// ヘッダーとクエリ文字列がリクエストに渡ることを確かめる。
 func TestWrapHeaderAndQuery(t *testing.T) {
 	t.Skip("TODO(L6): 実装したらこの行を消す")
 
@@ -205,6 +209,7 @@ func TestWrapHeaderAndQuery(t *testing.T) {
 	}
 }
 
+// authorizer の claims が context に載ること、無いときは載らないことを確かめる。
 func TestWrapClaims(t *testing.T) {
 	t.Skip("TODO(L6): 実装したらこの行を消す")
 
@@ -250,6 +255,7 @@ func TestWrapClaims(t *testing.T) {
 	}
 }
 
+// 組み立てられないイベント（不正な base64）は error ではなく 400 になり、ハンドラーが呼ばれないことを確かめる。
 func TestWrapBadEvent(t *testing.T) {
 	t.Skip("TODO(L6): 実装したらこの行を消す")
 
@@ -264,6 +270,7 @@ func TestWrapBadEvent(t *testing.T) {
 	}
 }
 
+// responseWriter が net/http と同じふるまい（既定の 200・WriteHeader は 1 回だけ有効）をすることを確かめる。
 func TestResponseWriter(t *testing.T) {
 	t.Skip("TODO(L6): 実装したらこの行を消す")
 

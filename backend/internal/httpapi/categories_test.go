@@ -10,6 +10,7 @@ import (
 	"github.com/macchi23/my-kakeibo-v2/backend/internal/kakeibo"
 )
 
+// createCategory は POST /categories でカテゴリを作り、201 と作成結果を確かめて返す（前準備用）。
 func createCategory(t *testing.T, e *testEnv, user kakeibo.UserID, in kakeibo.CategoryInput) kakeibo.Category {
 	t.Helper()
 	rec := e.do(t, user, http.MethodPost, "/categories", js(in))
@@ -17,6 +18,7 @@ func createCategory(t *testing.T, e *testEnv, user kakeibo.UserID, in kakeibo.Ca
 	return decode[kakeibo.Category](t, rec)
 }
 
+// 作成から取得・更新・アーカイブ・解除までの一連の流れを確かめる。
 func TestCategoryLifecycle(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -89,6 +91,7 @@ func TestCategoryLifecycle(t *testing.T) {
 	}
 }
 
+// 一覧の絞り込み・並び順・0 件のとき [] になることを確かめる。
 func TestCategoryList(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -112,6 +115,7 @@ func TestCategoryList(t *testing.T) {
 	}
 }
 
+// 不正な本文が 400 になることを確かめる。
 func TestCategoryBadRequests(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -137,6 +141,7 @@ func TestCategoryBadRequests(t *testing.T) {
 	}
 }
 
+// 不正な ID は 400、存在しない ID は 404 になることを、全ルートで確かめる。
 func TestCategoryInvalidIDAndNotFound(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -159,6 +164,7 @@ func TestCategoryInvalidIDAndNotFound(t *testing.T) {
 	}
 }
 
+// 更新で kind を変えようとすると 400 になることを確かめる。
 func TestCategoryKindCannotChange(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -174,6 +180,7 @@ func TestCategoryKindCannotChange(t *testing.T) {
 	}
 }
 
+// 同じ kind 内の名前の重複（作成・更新・アーカイブ解除）が 400 になることを確かめる。
 func TestCategoryDuplicateName(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -203,6 +210,7 @@ func TestCategoryDuplicateName(t *testing.T) {
 	wantError(t, rec, http.StatusBadRequest, "validation_error", "name")
 }
 
+// 有効な EXPENSE が上限に達していると作成・解除が 400 になることを確かめる。
 func TestCategoryExpenseLimit(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -236,6 +244,7 @@ func TestCategoryExpenseLimit(t *testing.T) {
 	createCategory(t, e, userB, kakeibo.CategoryInput{Name: "支出0", Kind: kakeibo.CategoryKindExpense})
 }
 
+// 2 人のユーザーでカテゴリが分離されていることを確かめる。
 func TestCategoryIsolation(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -270,6 +279,7 @@ func TestCategoryIsolation(t *testing.T) {
 	wantError(t, rec, http.StatusNotFound, "not_found", "")
 }
 
+// PUT で更新してもアーカイブ済みの状態が消えないことを確かめる。
 func TestCategoryPutKeepsArchivedAt(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 

@@ -10,8 +10,10 @@ import (
 	"unicode/utf8"
 )
 
+// AccountKind は口座の種別。Go には enum が無いので、string ベースの独自型と定数の組で代用する。
 type AccountKind string
 
+// 口座種別の定数。値はそのまま JSON と DynamoDB に保存される。
 const (
 	AccountKindBank   AccountKind = "BANK"
 	AccountKindCash   AccountKind = "CASH"
@@ -20,6 +22,7 @@ const (
 	AccountKindOther  AccountKind = "OTHER"
 )
 
+// 口座名の長さの範囲（rune 数）。
 const (
 	AccountNameMin = 1
 	AccountNameMax = 50
@@ -63,12 +66,12 @@ func (k AccountKind) IsValid() bool {
 //
 // 空白を除いた名前を保存するのは呼び出し側（ハンドラー）の仕事。ここは検査だけ。
 func (in AccountInput) Validate() error {
-	// TODO(L1): name と kind を検査する。
-	//   ヒント: strings.TrimSpace / utf8.RuneCountInString / switch でも map でもよい（kind の判定）
+	// 名前: 前後の空白を除いてから rune 数（文字数）で長さを数える。len() だとバイト数になり、日本語が 3 倍に数えられる。
 	n := utf8.RuneCountInString(strings.TrimSpace(in.Name))
 	if n < AccountNameMin || n > AccountNameMax {
 		return ValidationError{Field: "name", Message: "口座名は1-50文字にしてください"}
 	}
+	// 種別: 定義済みの値のどれかであること。
 	if !in.Kind.IsValid() {
 		return ValidationError{Field: "kind", Message: "口座種別の形式が正しくありません"}
 	}

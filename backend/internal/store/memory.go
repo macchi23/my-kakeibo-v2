@@ -34,6 +34,8 @@ func NewMemory() *Memory {
 	panic("TODO(L2)")
 }
 
+// ここから下は、口座・カテゴリそれぞれの一覧・取得・作成・更新（契約は Memory の説明のとおり）。
+// ListAccounts は自分の口座を ID の昇順で返す。
 func (m *Memory) ListAccounts(ctx context.Context, user kakeibo.UserID) ([]kakeibo.Account, error) {
 	// TODO(L2): m.mu.Lock(); defer m.mu.Unlock()。user の map を走査し、ID の昇順で返す。
 	//   ヒント: slices.Sorted(maps.Keys(...)) か、スライスに集めて slices.SortFunc。
@@ -57,6 +59,7 @@ func (m *Memory) UpdateAccount(ctx context.Context, user kakeibo.UserID, a kakei
 	panic("TODO(L2)")
 }
 
+// カテゴリの 4 メソッドは、口座と同じ処理を型だけ変えて行う。
 func (m *Memory) ListCategories(ctx context.Context, user kakeibo.UserID) ([]kakeibo.Category, error) {
 	// TODO(L2): ListAccounts と同じ要領。
 	panic("TODO(L2)")

@@ -14,6 +14,7 @@ export function createApp(props: { context?: Record<string, unknown> } = {}): {
   app: App;
   stack: KakeiboStack;
 } {
+  // App は CDK の木の根。スタックはすべてこの下に作る。
   const app = new App({ context: props.context });
 
   // env は渡さない。アカウント・リージョンは CLI の --profile で決まる
@@ -22,7 +23,9 @@ export function createApp(props: { context?: Record<string, unknown> } = {}): {
     synthesizer: new DefaultStackSynthesizer({ qualifier: BOOTSTRAP_QUALIFIER }),
   });
 
+  // 全 IAM ロールの Path を一括で書き換える（Aspect は、木の全リソースを走査して手を入れる仕組み）。
   Aspects.of(app).add(new RolePathAspect(), { priority: AspectPriority.MUTATING });
+  // 全リソースに Project タグを付ける（コストの按分と Budget の絞り込みに使う）。
   Tags.of(app).add(PROJECT_TAG_KEY, PROJECT_TAG_VALUE);
   return { app, stack };
 }

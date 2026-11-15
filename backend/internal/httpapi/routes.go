@@ -48,8 +48,11 @@ type Server struct {
 // パターンにメソッドを書く（Go 1.22+）ので、許可していないメソッドは自動で 405 になる。
 // 認証は含まない。userId は context に載っている前提で、載せるのは外側のミドルウェア（auth.RequireJWT / devauth.Middleware）。
 func NewHandler(s *Server) http.Handler {
+	// ルーターを作り、口座 → カテゴリの順にルートを登録する。
+	// s.handle(...) が「ユーザーの取り出し」と「エラーの HTTP 変換」を共通で包む。
 	mux := http.NewServeMux()
 
+	// 口座: 一覧・作成・取得・更新・アーカイブ・アーカイブ解除。
 	mux.Handle("GET /accounts", s.handle(s.listAccounts))
 	mux.Handle("POST /accounts", s.handle(s.createAccount))
 	mux.Handle("GET /accounts/{id}", s.handle(s.getAccount))
@@ -57,6 +60,7 @@ func NewHandler(s *Server) http.Handler {
 	mux.Handle("POST /accounts/{id}/archive", s.handle(s.archiveAccount))
 	mux.Handle("POST /accounts/{id}/unarchive", s.handle(s.unarchiveAccount))
 
+	// カテゴリ: 口座と同じ 6 本。
 	mux.Handle("GET /categories", s.handle(s.listCategories))
 	mux.Handle("POST /categories", s.handle(s.createCategory))
 	mux.Handle("GET /categories/{id}", s.handle(s.getCategory))

@@ -29,6 +29,7 @@ type errorBody struct {
 	Error errorDetail `json:"error"`
 }
 
+// errorDetail は errorBody の中身。`json:"..."` はこのフィールドの JSON 上の名前で、omitempty は空なら出力しない指定。
 type errorDetail struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`

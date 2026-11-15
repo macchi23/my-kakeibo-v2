@@ -1,3 +1,4 @@
+// スタック全体のテスト。createApp で作ったテンプレートに対し、タグ・IAM・設定値を assertions で確かめる。
 import { readFileSync } from 'node:fs';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
@@ -19,12 +20,14 @@ import {
   TOOLKIT_STACK_NAME,
 } from '../lib/project-constants';
 
+// cdk.json を読む（設定値のテストと、feature flags の取得に使う）。
 const cdkJson = JSON.parse(readFileSync(new URL('../cdk.json', import.meta.url), 'utf-8'));
 // feature flags が効いた状態でテストする（CLI が cdk.json の context を渡すのと同じ）
 // テストでは Go のビルドを走らせない
 const { stack } = createApp({ context: testContext() });
 const template = Template.fromStack(stack);
 
+// Cognito（ユーザープールとクライアント）の設定。CloudFormation テンプレートに対する assertions で確かめる。
 describe('Auth', () => {
   it('セルフサインアップが無効', () => {
     template.hasResourceProperties('AWS::Cognito::UserPool', {
@@ -59,6 +62,7 @@ describe('Auth', () => {
   });
 });
 
+// OAuth を使わないこと・MFA が必須なことなど、認証方式の設定。
 describe('Auth: OAuth / MFA', () => {
   it('OAuth が無効', () => {
     const clients = template.findResources('AWS::Cognito::UserPoolClient');
@@ -78,6 +82,7 @@ describe('Auth: OAuth / MFA', () => {
   });
 });
 
+// 月額予算（Budgets）の通知・名前・タグ。
 describe('Budget', () => {
   it('常に 1 つ作り、通知は 3 つ', () => {
     template.resourceCountIs('AWS::Budgets::Budget', 1);
@@ -127,6 +132,7 @@ describe('Budget', () => {
   });
 });
 
+// createApp が組み立てるスタック名と synthesizer の設定。
 describe('App 組み立て', () => {
   it('stackName が MyKakeiboV2', () => {
     expect(STACK_NAME).toBe('MyKakeiboV2');
@@ -141,6 +147,7 @@ describe('App 組み立て', () => {
   });
 });
 
+// 他から参照する出力値（Cognito の ID）。
 describe('Outputs', () => {
   it('UserPoolId / UserPoolClientId を出力する', () => {
     template.hasOutput('UserPoolId', {});
@@ -148,6 +155,7 @@ describe('Outputs', () => {
   });
 });
 
+// cdk.json の設定が、コード側の定数・方針と食い違っていないこと。
 describe('cdk.json', () => {
   it('toolkitStackName と qualifier が定数と一致する', () => {
     expect(cdkJson.toolkitStackName).toBe(TOOLKIT_STACK_NAME);
@@ -168,6 +176,7 @@ describe('cdk.json', () => {
   });
 });
 
+// API 一式（ルート・認可・テーブル・Lambda・ログ・段階的 deploy の切り替え）。
 describe('API', () => {
   const api = Template.fromStack(createApp({ context: testContext() }).stack);
   const tag = { Key: PROJECT_TAG_KEY, Value: PROJECT_TAG_VALUE };

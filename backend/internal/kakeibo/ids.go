@@ -7,8 +7,6 @@ import "uuid"
 
 // NewID はサーバーが採番する ID（UUIDv7 の文字列）を返す。時刻順に並ぶので、DynamoDB の SK の並びが作成順になる。
 func NewID() string {
-	// TODO(L1): uuid.NewV7() の結果を文字列にして返す。
-	//   ヒント: uuid.UUID の String メソッド
 	return uuid.NewV7().String()
 }
 
@@ -17,10 +15,11 @@ func NewID() string {
 // DynamoDB のキーは "ACCOUNT#{id}" と組むので、区切り文字の '#' などが入った値をここで必ず弾く。
 // uuid.Parse は urn:uuid: や波括弧付きも受け付けるため、入力をそのまま返さず、Parse した結果から文字列を作り直す。
 func ParseID(s string) (string, error) {
-	// TODO(L1): uuid.Parse で検証する。失敗したら ValidationError{Field: "id", ...} を返す。成功したら u.String() を返す。
+	// UUID として読めるか検証する。読めなければ ValidationError（err は捨てず、Go の慣習どおり nil か否かで判定）。
 	u, err := uuid.Parse(s)
 	if err != nil {
 		return "", ValidationError{Field: "id", Message: "ID の形式が正しくありません"}
 	}
+	// 入力ではなく Parse 後の値から正規形の文字列を作り直して返す。
 	return u.String(), nil
 }

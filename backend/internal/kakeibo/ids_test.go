@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// NewID が重複せず、UUIDv7 の形で、ParseID を通ることを確かめる。
 func TestNewID(t *testing.T) {
 	a, b := NewID(), NewID()
 	if a == b {
@@ -20,6 +21,7 @@ func TestNewID(t *testing.T) {
 	}
 }
 
+// 正規形はそのまま通し、キーを壊しうる入力（区切り文字・別表記）は ValidationError で弾くことを確かめる。
 func TestParseID(t *testing.T) {
 	const canonical = "018f3b0a-0000-7000-8000-000000000000"
 	tests := []struct {
@@ -61,6 +63,7 @@ func TestParseID(t *testing.T) {
 	}
 }
 
+// ValidationError の Error() の文言（Field の有無で変わる）を確かめる。
 func TestValidationErrorMessage(t *testing.T) {
 	tests := []struct {
 		name string

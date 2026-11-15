@@ -6,6 +6,7 @@
 # NOTE: このファイル自身に ".env"、アクセスキーの形、12桁数字をそのまま書かない。
 #       ".env" はコマンド行が guard-dotenv に当たり、キーの形は GitHub の push protection に当たるため、文字列を組み立てる
 
+# テスト用の定数。危険な文字列は、そのまま書かずに連結して組み立てる（上の NOTE の理由）。
 DIR="$(cd "$(dirname "$0")" && pwd)"
 DOT=".env"
 FAKE_KEY="AKIA""ABCDEFGHIJKLMNOP"
@@ -14,8 +15,10 @@ FAKE_SECRET="wJalrXUtnFEMI/K7MDENG""/bPxRfiCYEXAMPLEKEY"  # gitleaks:allow（テ
 ROOT="/proj"
 FAIL=0
 
+# 文字列を JSON の文字列リテラルにする（hook に渡す入力 JSON を組み立てるため）。
 json() { python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$1"; }
 
+# 期待と結果を比べて OK / NG を表示する。NG の数を FAIL に数え、最後の終了コードに使う。
 report() {  # report <want> <got> <説明>
   if [ "$1" = "$2" ]; then printf 'OK   '; else printf 'NG   '; FAIL=$((FAIL + 1)); fi
   printf 'want=%s got=%s  %s\n' "$1" "$2" "$3"
@@ -30,6 +33,7 @@ decision() {  # decision <hook> <入力JSON>
   echo "$out" | jq -r '.hookSpecificOutput.permissionDecision'
 }
 
+# Bash ツールのコマンドを入力にして hook を実行し、判定を期待と比べる。agent_id を渡すとサブエージェントからの呼び出しになる。
 bash_cmd() {  # bash_cmd <hook> <want> <コマンド> [agent_id]
   local input
   if [ -n "${4:-}" ]; then
@@ -40,12 +44,14 @@ bash_cmd() {  # bash_cmd <hook> <want> <コマンド> [agent_id]
   report "$2" "$(decision "$1" "$input")" "$1: $3${4:+ (subagent)}"
 }
 
+# ファイル書き込みを入力にして guard-hardcode を実行し、判定を期待と比べる。
 write_file() {  # write_file <want> <相対パス> <内容>
   local input
   input=$(printf '{"tool_input":{"file_path":%s,"content":%s}}' "$(json "$ROOT/$2")" "$(json "$3")")
   report "$1" "$(decision guard-hardcode.sh "$input")" "guard-hardcode: $2 <- $3"
 }
 
+# 各 hook ごとに、「塞ぐべきもの」と「通すべきもの」を並べる。block / deny / ask / allow が期待する判定。
 echo "=== guard-dotenv ==="
 bash_cmd guard-dotenv.sh block "cat $DOT"
 bash_cmd guard-dotenv.sh block "grep -c KEY $DOT"
@@ -222,6 +228,7 @@ write_file deny "docs/handover.md" "export AWS_SECRET_ACCESS_KEY=$FAKE_SECRET"
 write_file deny "docs/handover.md" "aws_secret_access_key = $FAKE_SECRET"
 write_file deny "web/src/x.ts" "const clientSecret = \`$FAKE_SECRET\`"
 
+# 結果の集計。ずれが 1 件でもあれば、その件数を終了コードにして失敗させる。
 echo
 if [ "$FAIL" -eq 0 ]; then echo "OK: 全部期待どおり"; else echo "NG: $FAIL 件ずれている"; fi
 exit "$FAIL"

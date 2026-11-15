@@ -14,6 +14,7 @@ import (
 	"github.com/macchi23/my-kakeibo-v2/backend/internal/kakeibo"
 )
 
+// createAccount は POST /accounts で口座を作り、201 と作成結果を確かめて返す（他のテストの前準備用）。
 func createAccount(t *testing.T, e *testEnv, user kakeibo.UserID, in kakeibo.AccountInput) kakeibo.Account {
 	t.Helper()
 	rec := e.do(t, user, http.MethodPost, "/accounts", js(in))
@@ -21,6 +22,7 @@ func createAccount(t *testing.T, e *testEnv, user kakeibo.UserID, in kakeibo.Acc
 	return decode[kakeibo.Account](t, rec)
 }
 
+// 作成から取得・更新・アーカイブ・解除までの一連の流れを確かめる。
 func TestAccountLifecycle(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -105,6 +107,7 @@ func TestAccountLifecycle(t *testing.T) {
 	}
 }
 
+// 一覧の絞り込み（アーカイブ済み）・並び順・0 件のとき [] になることを確かめる。
 func TestAccountList(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -131,6 +134,7 @@ func TestAccountList(t *testing.T) {
 	}
 }
 
+// 不正な本文（未知のフィールド・壊れた JSON・検証エラーなど）が 400 になることを確かめる。
 func TestAccountBadRequests(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -179,6 +183,7 @@ func TestAccountBadRequests(t *testing.T) {
 	}
 }
 
+// 本文が上限を超えると 413 になることを確かめる。
 func TestAccountBodyTooLarge(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -188,6 +193,7 @@ func TestAccountBodyTooLarge(t *testing.T) {
 	wantError(t, rec, http.StatusRequestEntityTooLarge, "payload_too_large", "")
 }
 
+// パスの ID が UUID でないとき 400 になることを確かめる。
 func TestAccountInvalidID(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -209,6 +215,7 @@ func TestAccountInvalidID(t *testing.T) {
 	}
 }
 
+// 存在しない ID が 404 になることを確かめる。
 func TestAccountNotFound(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -233,6 +240,7 @@ func TestAccountNotFound(t *testing.T) {
 	}
 }
 
+// DELETE は提供していない（物理削除しない）ので 405 になることを確かめる。
 func TestAccountNoDelete(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -288,6 +296,7 @@ func TestAccountIsolation(t *testing.T) {
 	}
 }
 
+// ユーザーが context に無いとき、全ルートが 401 になることを確かめる。
 func TestUnauthenticated(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -326,6 +335,7 @@ func (f failingStore) UpdateAccount(context.Context, kakeibo.UserID, kakeibo.Acc
 	return f.err
 }
 
+// 500 のとき、ストアのエラー文を利用者に返さないことを確かめる。
 func TestInternalErrorHidesDetail(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 
@@ -347,6 +357,7 @@ func TestInternalErrorHidesDetail(t *testing.T) {
 	}
 }
 
+// PUT で更新してもアーカイブ済みの状態（ArchivedAt）が消えないことを確かめる。
 func TestAccountPutKeepsArchivedAt(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 

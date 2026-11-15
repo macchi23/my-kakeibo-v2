@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// 口座名の長さ（rune 数・空白の扱い）と kind の検査を、ケースごとに期待するエラーのフィールドで確かめる。
 func TestAccountInputValidate(t *testing.T) {
 	tests := []struct {
 		name      string

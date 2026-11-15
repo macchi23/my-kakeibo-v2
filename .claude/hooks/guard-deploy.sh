@@ -11,6 +11,7 @@
 #       名前を含むなら、読み取りだけの書き方（下の許可リスト）以外は止める。ベストエフォートで、悪意のある書き方をすべては防げない
 command -v jq >/dev/null 2>&1 || { echo "jq が無いので判定できない（hook は fail-closed）" >&2; exit 2; }
 
+# 標準入力の JSON から、実行しようとしているコマンドを取り出す。
 INPUT=$(cat)
 CMD=$(echo "$INPUT" | jq -r '.tool_input.command // ""')
 
@@ -52,13 +53,17 @@ policy_script_reason() {
 $(printf '%s\n' "$CMD" | awk '{ gsub(/[0-9]*>&[0-9-]+/, ""); gsub(/&>/, ">"); gsub(/\|\|/, "\n"); gsub(/\|&/, "\n|"); gsub(/&&/, "\n"); gsub(/\|/, "\n|"); gsub(/[;&(){}]/, "\n"); print }')
 EOF
 }
+# 判定用の文字列（PROBE）を作る: 引用符の中身を消して、echo や grep の引数に含まれるだけの語を誤検出しないようにする。
 # bash -c "..." / sh -c '...' / eval "..." の中身は、引用符を消す前に取り出して別のコマンドとしても判定する
 INNER=$(echo "$CMD" | grep -oE "(-c|eval)[[:space:]]+(\"[^\"]*\"|'[^']*')" | sed -E "s/^(-c|eval)[[:space:]]+//; s/^[\"']//; s/[\"']\$//")
 PROBE=$(printf '%s\n%s\n' "$CMD" "$INNER" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
 
+# 書き込みとみなす cdk のサブコマンドと、aws CLI の操作名（先頭語）の正規表現。
 CDK_ACTIONS='deploy|bootstrap|destroy|watch|import|rollback|gc'
 AWS_WRITE='(create|delete|put|update|remove|terminate|admin|deploy|attach|detach|tag|untag|set|enable|disable|modify|invoke|cancel|reset|restore|import|batch|execute|continue|converse|start|stop|send|publish|run|assume|transact|register|deregister|associate|disassociate|revoke|authorize|change|copy|replace|rotate)(-[a-z0-9-]+)?'
 
+# 判定本体。set -f は、コマンド中の * がファイル名に展開されないようにする。
+# まず反映スクリプトの照合、次にコマンドを区切りで分けて、先頭語が cdk / aws のものを順に見る。最初に見つけた理由を found に入れる。
 set -f
 found=""
 reason=$(policy_script_reason)
@@ -70,6 +75,7 @@ reason=$(policy_script_reason)
     prev="$seg"
     seg=$(echo "$seg" | sed -E 's/^[[:space:]]+//; s/^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]*//; s/^(time|nohup|sudo|exec|command|builtin)([[:space:]]+|$)//; s/^env([[:space:]]+-[^[:space:]]+)*([[:space:]]+|$)//')
   done
+  # 先頭語で、cdk 系（npx / npm 経由を含む）と aws に振り分ける。
   first=${seg%% *}
   # shellcheck disable=SC2086
   set -- $seg
@@ -101,8 +107,10 @@ done <<EOF
 $(echo "$PROBE" | awk '{ gsub(/&&|\|\||[;|(]/, "\n"); print }')
 EOF
 set +f
+# 何も見つからなければ通す。
 [ -z "$found" ] && exit 0
 
+# 見つかったときの返答。権限の判断（deny / ask）を JSON で標準出力に返す。
 decide() {
   jq -cn --arg d "$1" --arg r "$2" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: $d, permissionDecisionReason: $r}}'
   exit 0

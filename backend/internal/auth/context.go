@@ -13,6 +13,7 @@ import (
 // string を直接キーにすると、別のパッケージが同じ文字列を使ったときに衝突する。
 type ctxKey int
 
+// context に載せる値の種類ごとのキー。iota は 0, 1, ... と自動で番号を振る（列挙型の代わり）。
 const (
 	userIDKey ctxKey = iota
 	claimsKey

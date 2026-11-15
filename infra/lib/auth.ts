@@ -2,6 +2,8 @@ import { Duration, RemovalPolicy } from 'aws-cdk-lib';
 import { AccountRecovery, Mfa, UserPool, UserPoolClient } from 'aws-cdk-lib/aws-cognito';
 import { Construct } from 'constructs';
 
+// 認証まわり（Cognito のユーザープールとクライアント）をまとめた Construct。
+// Construct は CDK のリソースの束で、クラスにしてスタックから new して使う。
 export class Auth extends Construct {
   public readonly userPool: UserPool;
   public readonly userPoolClient: UserPoolClient;

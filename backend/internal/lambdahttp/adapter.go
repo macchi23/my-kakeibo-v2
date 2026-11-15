@@ -55,6 +55,7 @@ type responseWriter struct {
 	wroteHeader bool
 }
 
+// newResponseWriter は空の responseWriter を作るコンストラクタ（Go に constructor 構文は無く、New〜 関数で代用する慣習）。
 func newResponseWriter() *responseWriter {
 	// TODO(L6): header を make(http.Header) で初期化して返す（nil の map に Set すると panic する）。
 	panic("TODO(L6)")

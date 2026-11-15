@@ -6,9 +6,11 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 
+# 引数で検査の対象を選ぶ（省略すると all）。failed には、失敗したステップの名前を溜めていく。
 target="${1:-all}"
 failed=()
 
+# 1 ステップを実行して結果を表示し、失敗したら名前を記録する（止めずに次へ進む）。
 step() {  # step <名前> <コマンド...>
   local name=$1; shift
   echo "==> $name"
@@ -24,6 +26,7 @@ need() {  # need <コマンド>: 無ければ実行不能で終了
   command -v "$1" >/dev/null 2>&1 || { echo "check: $1 が見つからない（docs/setup.md の前提を参照）"; exit 2; }
 }
 
+# gofmt -l は整形が必要なファイル名を出力する。1 つでもあれば失敗にする。
 gofmt_clean() {
   local out
   out=$(gofmt -l .)
@@ -40,6 +43,8 @@ lambda_without_devauth() {
   fi
 }
 
+# Go の検査: 整形 → 依存の整合 → vet → テスト → devauth の混入 → Lambda 向け（arm64）のビルド。
+# ( ... ) のサブシェルで cd して、元の場所に影響を与えない。
 run_go() {
   if [ ! -f backend/go.mod ]; then echo "skip: go（backend/go.mod が無い）"; return; fi
   need go
@@ -55,6 +60,7 @@ run_go() {
   ) || failed+=("go")
 }
 
+# CDK の検査: 型検査 → テスト → synth（テンプレートを作れること。AWS には何も反映しない）。
 run_infra() {
   if [ ! -f infra/package.json ]; then echo "skip: infra（infra/package.json が無い）"; return; fi
   [ -d infra/node_modules ] || { echo "check: infra/node_modules が無い。cd infra && npm ci"; exit 2; }
@@ -67,6 +73,7 @@ run_infra() {
   ) || failed+=("infra")
 }
 
+# Next.js の検査: lint と型検査。web/ がまだ無ければ skip する。
 run_web() {
   if [ ! -f web/package.json ]; then echo "skip: web（web/package.json が無い）"; return; fi
   [ -d web/node_modules ] || { echo "check: web/node_modules が無い。cd web && npm ci"; exit 2; }
@@ -78,6 +85,7 @@ run_web() {
   ) || failed+=("web")
 }
 
+# 検査対象のシェルスクリプトの一覧（scripts/ と hook）。
 shell_files() {
   ls scripts/*.sh .claude/hooks/*.sh 2>/dev/null
 }
@@ -89,6 +97,7 @@ bash_syntax() {
   return $rc
 }
 
+# シェルの検査: 構文 → shellcheck → scripts 自体のテスト。
 run_shell() {
   need shellcheck
   step "bash -n" bash_syntax
@@ -98,6 +107,7 @@ run_shell() {
   step "script tests" bash scripts/test_apply_cfn_exec_app_policy.sh
 }
 
+# hook（.claude/hooks）の判定が期待どおりかのテスト。
 run_hooks() {
   need jq
   step "hook tests" bash .claude/hooks/test_guards.sh
@@ -112,6 +122,7 @@ scan_history() {
 }
 
 scan_worktree() {
+  # 対象のファイルだけを一時ディレクトリに写して検査する（.gitignore 済みの .env や notes を巻き込まないため）。
   local tmp rc
   tmp=$(mktemp -d) || return 1
   git ls-files -co --exclude-standard -z | while IFS= read -r -d '' f; do
@@ -129,6 +140,7 @@ run_secrets() {
   step "gitleaks worktree" scan_worktree
 }
 
+# 引数に応じて、検査を選んで実行する。
 case "$target" in
   go) run_go ;;
   infra) run_infra ;;
@@ -140,6 +152,7 @@ case "$target" in
   *) echo "usage: scripts/check.sh [go|infra|web|shell|hooks|secrets|all]"; exit 2 ;;
 esac
 
+# 失敗が 1 つでもあれば終了コード 1、無ければ 0。
 if [ ${#failed[@]} -eq 0 ]; then
   echo "check: ok ($target)"
   exit 0

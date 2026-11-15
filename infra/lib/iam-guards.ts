@@ -6,6 +6,7 @@ import { ROLE_PATH } from './project-constants';
 // CFN 実行ロールのポリシーが path で CreateRole を絞るため
 export class RolePathAspect implements IAspect {
   public visit(node: IConstruct): void {
+    // 木の各ノードが渡される。IAM ロールの CloudFormation リソースだけを選んで Path を上書きする。
     if (CfnResource.isCfnResource(node) && node.cfnResourceType === 'AWS::IAM::Role') {
       node.addPropertyOverride('Path', ROLE_PATH);
     }

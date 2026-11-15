@@ -18,6 +18,7 @@ import (
 )
 
 func main() {
+	// 構造化ログ（JSON）を標準エラーに出す。Lambda では CloudWatch Logs に集まる。
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 
 	// テーブル名は CDK が環境変数で渡す。無いまま起動すると、リクエストのたびに失敗するので起動時に落とす。
@@ -33,8 +34,10 @@ func main() {
 		logger.Error("AWS 設定の読み込みに失敗", "error", err)
 		os.Exit(1)
 	}
+	// DynamoDB のクライアントを作り、ストア（本番の実装）に渡す。
 	db := store.NewDynamo(dynamodb.NewFromConfig(cfg), table)
 
+	// ハンドラーの依存をまとめて渡す。cmd/api とは、ストアが DynamoDB である点だけが違う。
 	api := httpapi.NewHandler(&httpapi.Server{
 		Accounts:   db,
 		Categories: db,
@@ -42,5 +45,7 @@ func main() {
 		Log:        logger,
 	})
 
+	// 内側から順に、api（業務処理）→ JWT の検証 → API Gateway のイベントを http.Handler に変換するアダプタ。
+	// lambda.Start はイベントの待ち受けを始め、戻ってこない。
 	lambda.Start(lambdahttp.Wrap(auth.RequireJWT(api)))
 }

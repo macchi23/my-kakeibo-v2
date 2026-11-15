@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// wantValidationField は err が、field（空なら nil）に対応する ValidationError であることを確かめる。
 func wantValidationField(t *testing.T, err error, field string) {
 	t.Helper()
 	if field == "" {
@@ -25,6 +26,7 @@ func wantValidationField(t *testing.T, err error, field string) {
 	}
 }
 
+// カテゴリ名・説明の長さと kind の検査を確かめる。
 func TestCategoryInputValidate(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -47,6 +49,7 @@ func TestCategoryInputValidate(t *testing.T) {
 	}
 }
 
+// 他のカテゴリとの関係（名前の重複・EXPENSE の件数上限・アーカイブ済みの扱い）を確かめる。
 func TestCheckCategoryConstraints(t *testing.T) {
 	archived := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	cat := func(id, name string, kind CategoryKind, archivedAt *time.Time) Category {
@@ -148,6 +151,7 @@ func TestCheckCategoryConstraints(t *testing.T) {
 	}
 }
 
+// kind の変更だけが拒否されることを確かめる。
 func TestCheckKindUnchanged(t *testing.T) {
 	tests := []struct {
 		name      string

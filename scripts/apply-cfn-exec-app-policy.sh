@@ -14,6 +14,7 @@
 # プロファイル・リージョン・スタック名・origin の URL は固定で、引数や環境変数では変えられない。
 set -euo pipefail
 
+# 固定値。引数や環境変数では変えられないようにして、別のアカウント・スタックに向けられないようにしている。
 PROFILE=default
 REGION=us-east-1
 STACK_NAME=MyKakeiboV2
@@ -83,6 +84,8 @@ policy_problems() {  # policy_problems <文書> <API ID>
   ' "$1"
 }
 
+# 全体の流れ: 引数の確認 → origin の確認と main の取得 → スタックから API ID を取得 → 実在の API の確認 →
+# ID を埋めて検査 → validate-policy → 版の上限 → 差分表示 → （--apply のとき）確認して反映。
 main() {
   local apply=0
   case "${1:-}" in

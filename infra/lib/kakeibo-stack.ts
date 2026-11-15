@@ -5,16 +5,19 @@ import { Auth } from './auth';
 import { ProjectBudget } from './budget';
 import { WITH_HTTP_API_CONTEXT_KEY, WITH_HTTP_API_STAGE_CONTEXT_KEY } from './project-constants';
 
+// このアプリ唯一のスタック。認証・予算・API の Construct を組み合わせ、出力値を定義する。
 export class KakeiboStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
+    // 認証（Cognito）と月額予算（Budgets）。
     const auth = new Auth(this, 'Auth');
     new ProjectBudget(this, 'Budget');
 
     // CLI の -c は文字列で渡る。'false' と false の両方を false と扱う
     const withHttpApi = String(this.node.tryGetContext(WITH_HTTP_API_CONTEXT_KEY)) !== 'false';
     const withHttpApiStage = String(this.node.tryGetContext(WITH_HTTP_API_STAGE_CONTEXT_KEY)) !== 'false';
+    // API（DynamoDB・Lambda・HTTP API）。認証で作ったユーザープールを JWT authorizer に渡す。
     const api = new Api(this, 'Api', {
       userPool: auth.userPool,
       userPoolClient: auth.userPoolClient,

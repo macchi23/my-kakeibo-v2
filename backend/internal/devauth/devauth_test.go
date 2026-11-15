@@ -9,6 +9,7 @@ import (
 	"github.com/macchi23/my-kakeibo-v2/backend/internal/kakeibo"
 )
 
+// ヘッダーの有無で、next に渡る UserID が切り替わることを確かめる。
 func TestMiddleware(t *testing.T) {
 	t.Skip("TODO(L3): 実装したらこの行を消す")
 

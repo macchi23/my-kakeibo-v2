@@ -19,9 +19,14 @@ import (
 )
 
 func main() {
+	// 構造化ログ（JSON）を標準エラーに出す。Python の logging に当たる slog を使う。
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 
+	// ストアはインメモリ。プロセスを止めるとデータは消える。
+	// 1 つの mem が口座とカテゴリ両方のインターフェースを満たすので、同じ値を 2 つのフィールドに渡す。
 	mem := store.NewMemory()
+
+	// ハンドラーの依存（ストア・時計・ロガー）をまとめて渡して、ルーティング済みの http.Handler を作る。
 	api := httpapi.NewHandler(&httpapi.Server{
 		Accounts:   mem,
 		Categories: mem,
@@ -35,6 +40,7 @@ func main() {
 		Handler:           devauth.Middleware(api),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+	// ListenAndServe は止まるまで戻ってこない。戻ってきた = エラーなので、ログを出して異常終了する。
 	logger.Info("listening", "addr", srv.Addr)
 	if err := srv.ListenAndServe(); err != nil {
 		logger.Error("server stopped", "error", err)

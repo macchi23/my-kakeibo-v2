@@ -16,8 +16,10 @@ export class ProjectBudget extends Construct {
   constructor(scope: Construct, id: string, props: ProjectBudgetProps = {}) {
     super(scope, id);
 
+    // 通知先メールは SSM から取る（コードにもリポジトリにも書かないため）。
     const email = StringParameter.valueForStringParameter(this, BUDGET_EMAIL_PARAMETER);
 
+    // 通知 1 件分（種別としきい値）を作る小さな関数。メール通知の宛先は全件で共通。
     const notification = (type: 'ACTUAL' | 'FORECASTED', threshold: number) => ({
       notification: {
         notificationType: type,
@@ -28,6 +30,7 @@ export class ProjectBudget extends Construct {
       subscribers: [{ subscriptionType: 'EMAIL', address: email }],
     });
 
+    // 月額の予算本体。Project タグが付いたリソースの費用だけを対象にする。
     this.budget = new CfnBudget(this, 'Budget', {
       budget: {
         budgetName: BUDGET_NAME,
@@ -40,6 +43,7 @@ export class ProjectBudget extends Construct {
       },
       // CfnBudget には Tags.of が効かないので明示する
       resourceTags: [{ key: PROJECT_TAG_KEY, value: PROJECT_TAG_VALUE }],
+      // 通知: 実績 80% / 実績 100% / 予測 100% の 3 つ。
       notificationsWithSubscribers: [
         notification('ACTUAL', 80),
         // FORECASTED は利用履歴が溜まるまで発火しないので、ACTUAL 100% も置く
