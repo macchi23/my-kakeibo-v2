@@ -102,6 +102,7 @@ P0 のあとで、実行ロールのポリシーを 2 本に分け、permissions
      --policy-document file://infra/iam/cfn-exec-policy.json
    ```
    - `validate-policy` は ERROR が 0 であること。SUGGESTION・WARNING は内容を読んで判断する
+     - 例外: `cfn-exec-app-policy.json` の `apigateway:TagResource`（Sid `ApiGatewayTagProjectStage`）は Service Reference に無い操作なので、`INVALID_ACTION` の ERROR が出うる。実際の deploy では評価されている（2026-11-15）。この 1 件だけ許容し、消すために `apigateway:*` や条件なしの `/tags/*` に置き換えない
 2. bootstrap をやり直す（`default`、`infra/`）。付けるポリシーの ARN が 2 本になるため。他のフラグは手順 5 と同じ
    ```sh
    npx cdk bootstrap "aws://${ACCOUNT}/us-east-1" --profile default \
@@ -144,11 +145,13 @@ P0 のあとで、実行ロールのポリシーを 2 本に分け、permissions
 
 AccessDenied が出たとき: スタックイベントで拒否された操作を確かめ、該当の JSON を直して版を上げる（上の手順 1 の `create-policy-version`。`cfn-exec` と `cfn-exec-app` のどちらの JSON か、ARN を取り違えない）。
 **権限を広げて回避しない。** 条件を外す、タグ付けの権限を条件なしで足す、といった変更は他 PJ のリソースに届くので、止めてユーザーに相談する。初回 deploy で確かめきれていない点は次のとおり。
-1. HTTP API の子リソース（routes / integrations / authorizers / stages / deployments）にリソースタグの条件が効かないとき。V2 の子リソースにタグが継承されるとは文書に書かれていない（I2 の security-reviewer）。
+1. （2026-11-15 の deploy で、Route / Integration / Authorizer の作成に ResourceTag 条件が効くことを確認した。Stage は下の 3 番）HTTP API の子リソース（routes / integrations / authorizers / stages / deployments）にリソースタグの条件が効かないとき。V2 の子リソースにタグが継承されるとは文書に書かれていない（I2 の security-reviewer）。
    `withHttpApi=true` は Api と子リソースを 1 回で作るので、子リソースで AccessDenied になるとロールバックで Api も消え、ID が残らない。ここで止めて相談する。
    相談の案: Api だけを作る段を CDK に足して先に deploy し、ID を得て、Resource を `arn:aws:apigateway:us-east-1::/apis/<その ID>/*` に固定する（ID は反映時にシェル変数で埋め、リポジトリには置かない）
 2. 各ハンドラーが作成リクエストにタグを含めないとき（`aws:RequestTag/Project` の条件が効かない）
-3. Stage のハンドラーが `apigateway:TagResource` を要求するとき（Service Reference に `TagResource` は無い。確認済み: タグ付けは `/tags/*` への `apigateway:PUT` / `DELETE`で、POST ではない）。条件なしで足すと他 PJ の API に `Project` タグを付けて条件を乗っ取れるので、足さずに相談する
+3. タグ付けの権限（Service Reference に `TagResource` は無い）。2026-11-15 の deploy で、Api の作成時に `/tags/arn%3Aaws%3Aapigateway%3Aus-east-1%3A%3A%2Fv2%2Fapis%2F*`（未作成の仮 ARN）への `apigateway:POST` が評価され、AccessDenied になった。観測した事実はエラー文のリソースまでで、作成前の事前認可が未作成の仮 ARN に対して行われる、という理由は推測。対応として、この仮 ARN だけ（末尾は `${*}` で文字どおりの `*`）に `aws:RequestTag/Project` 条件付きで許可を足した（`ApiGatewayTagOnCreateHttpApi`）。実在の API の ARN は `/apis/{id}` なので既存 API には当たらない想定だが、根拠は Service Reference の ARN 形式で、TagResource が `/v2/apis/{id}` の形を受け付けないかは未確認。
+   Service Reference の POST の対象リソースに Tags は載っていないが、V2 の TagResource は `POST /v2/tags/{resource-arn}`（API リファレンス）。Service Reference に無いことは「存在しない」根拠にしない。
+   Stage の作成では `apigateway:TagResource`（Service Reference に載っていない操作）が `/apis/{id}/stages` に対して評価され、AccessDenied になった（Route / Integration / Authorizer は通った）。RequestTag と ResourceTag の両方を条件にした許可を足した（`ApiGatewayTagProjectStage`）。ResourceTag 条件がこの操作で効くかは次の deploy で確かめる（効かなければ AccessDenied で止まる）。条件なしで `/tags/*` を足すと他 PJ の API に `Project` タグを付けて条件を乗っ取れるので、足さずに相談する
 4. アセットの読み取りで KMS の権限が要るとき（`aws/s3` 管理キーなら要らない想定）
 5. 失敗した作成のロールバックで RETAIN のリソースが残る（上の手順 5）
 

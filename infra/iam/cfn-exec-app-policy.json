@@ -136,6 +136,32 @@
       }
     },
     {
+      "Sid": "ApiGatewayTagOnCreateHttpApi",
+      "Effect": "Allow",
+      "Action": "apigateway:POST",
+      "Resource": "arn:aws:apigateway:us-east-1::/tags/arn%3Aaws%3Aapigateway%3Aus-east-1%3A%3A%2Fv2%2Fapis%2F${*}",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "my-kakeibo-v2"
+        }
+      }
+    },
+    {
+      "Sid": "ApiGatewayTagProjectStage",
+      "Effect": "Allow",
+      "Action": "apigateway:TagResource",
+      "Resource": [
+        "arn:aws:apigateway:us-east-1::/apis/*/stages",
+        "arn:aws:apigateway:us-east-1::/apis/*/stages/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "my-kakeibo-v2",
+          "aws:ResourceTag/Project": "my-kakeibo-v2"
+        }
+      }
+    },
+    {
       "Sid": "ApiGatewayManageProjectHttpApi",
       "Effect": "Allow",
       "Action": [

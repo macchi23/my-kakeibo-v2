@@ -52,9 +52,20 @@ const creating = (s: Statement) =>
 const namedForProject = (s: Statement) => list(s.Resource).every((r) => r !== '*' && PROJECT_MARKER.test(r));
 // タグ条件は StringEquals で値が PROJECT_TAG_VALUE のものだけを認める。
 // RequestTag は作成系だけ。タグ付け系は ResourceTag かプロジェクト名の Resource を必須にする（RequestTag は呼び出し側が自由に付けられるため）
+// 例外: HTTP API の作成時、タグ付けの事前認可は未作成の仮 ARN（/v2/apis/*）に対して行われる。
+// 実在の API の ARN は /apis/{id} なので、この仮 ARN の許可は既存 API には当たらない。内容で判定する（Sid では免除しない）
+// 末尾の ${*} は文字どおりの * 1 文字（生の * だと /v2/apis/{任意の ID} に合致してしまう）
+const CREATE_TIME_TAG_ARN = 'arn:aws:apigateway:us-east-1::/tags/arn%3Aaws%3Aapigateway%3Aus-east-1%3A%3A%2Fv2%2Fapis%2F${*}';
+const tagOnCreate = (s: Statement) =>
+  list(s.Resource).join() === CREATE_TIME_TAG_ARN &&
+  list(s.Action).join() === 'apigateway:POST' &&
+  Object.keys(s.Condition ?? {}).join() === 'StringEquals' &&
+  Object.keys(s.Condition?.StringEquals ?? {}).join() === 'aws:RequestTag/Project' &&
+  isTagValue(s, 'aws:RequestTag/Project');
 const scopedToProject = (s: Statement) => {
   const resTag = isTagValue(s, 'aws:ResourceTag/Project');
   if (namedForProject(s)) return true;
+  if (tagOnCreate(s)) return true;
   if (tagging(s)) return resTag;
   return creating(s) ? resTag || isTagValue(s, 'aws:RequestTag/Project') : resTag;
 };
@@ -157,6 +168,12 @@ describe('scopedToProject の判定', () => {
     ['/tags/* に RequestTag だけ', { Action: 'apigateway:PUT', Resource: 'arn:aws:apigateway:us-east-1::/tags/*', Condition: { StringEquals: { 'aws:RequestTag/Project': PROJECT_TAG_VALUE } } }],
     ['StringLike で値が *', { Action: 'apigateway:GET', Resource: 'arn:aws:apigateway:us-east-1::/apis/*', Condition: { StringLike: { 'aws:ResourceTag/Project': '*' } } }],
     ['StringNotEquals', { Action: 'apigateway:GET', Resource: 'arn:aws:apigateway:us-east-1::/apis/*', Condition: { StringNotEquals: { 'aws:ResourceTag/Project': PROJECT_TAG_VALUE } } }],
+    ['/tags/* に POST と RequestTag', { Action: 'apigateway:POST', Resource: 'arn:aws:apigateway:us-east-1::/tags/*', Condition: { StringEquals: { 'aws:RequestTag/Project': PROJECT_TAG_VALUE } } }],
+    ['実在 ARN の形（v2 なし）の /tags/', { Action: 'apigateway:POST', Resource: 'arn:aws:apigateway:us-east-1::/tags/arn%3Aaws%3Aapigateway%3Aus-east-1%3A%3A%2Fapis%2F*', Condition: { StringEquals: { 'aws:RequestTag/Project': PROJECT_TAG_VALUE } } }],
+    ['仮 ARN の末尾が生の *（任意の ID に合致）', { Action: 'apigateway:POST', Resource: 'arn:aws:apigateway:us-east-1::/tags/arn%3Aaws%3Aapigateway%3Aus-east-1%3A%3A%2Fv2%2Fapis%2F*', Condition: { StringEquals: { 'aws:RequestTag/Project': PROJECT_TAG_VALUE } } }],
+    ['仮 ARN の小文字版', { Action: 'apigateway:POST', Resource: 'arn:aws:apigateway:us-east-1::/tags/arn%3aaws%3aapigateway%3aus-east-1%3a%3a%2fv2%2fapis%2f*', Condition: { StringEquals: { 'aws:RequestTag/Project': PROJECT_TAG_VALUE } } }],
+    ['仮 ARN に PUT', { Action: 'apigateway:PUT', Resource: CREATE_TIME_TAG_ARN, Condition: { StringEquals: { 'aws:RequestTag/Project': PROJECT_TAG_VALUE } } }],
+    ['仮 ARN で条件なし', { Action: 'apigateway:POST', Resource: CREATE_TIME_TAG_ARN }],
     ['条件なし', { Action: 'apigateway:GET', Resource: 'arn:aws:apigateway:us-east-1::/apis/*/routes*' }],
     ['別の値', { Action: 'apigateway:GET', Resource: 'arn:aws:apigateway:us-east-1::/apis/*', Condition: { StringEquals: { 'aws:ResourceTag/Project': 'other' } } }],
   ])('拒否する: %s', (_n, partial) => {
@@ -167,6 +184,26 @@ describe('scopedToProject の判定', () => {
     const manage = { Action: 'apigateway:GET', Resource: 'arn:aws:apigateway:us-east-1::/apis/*', Condition: { StringEquals: { 'aws:ResourceTag/Project': PROJECT_TAG_VALUE } } };
     expect(scopedToProject({ ...base, ...create } as Statement)).toBe(true);
     expect(scopedToProject({ ...base, ...manage } as Statement)).toBe(true);
+  });
+  it('作成時の仮 ARN への POST + RequestTag は通す', () => {
+    const tagOnCreateStmt = { Action: 'apigateway:POST', Resource: CREATE_TIME_TAG_ARN, Condition: { StringEquals: { 'aws:RequestTag/Project': PROJECT_TAG_VALUE } } };
+    expect(scopedToProject({ ...base, ...tagOnCreateStmt } as Statement)).toBe(true);
+  });
+});
+
+describe('ApiGatewayTagProjectStage', () => {
+  // apigateway:TagResource は Service Reference の Actions に無いが、Stage の作成時に実際に評価された（2026-11-15）
+  const s = docs['cfn-exec-app-policy.json'].Statement.find((x) => x.Sid === 'ApiGatewayTagProjectStage');
+  it('Action・Resource・条件が決めた形のまま', () => {
+    expect(s?.Effect).toBe('Allow');
+    expect(s?.Action).toBe('apigateway:TagResource');
+    expect(list(s?.Resource ?? []).sort()).toEqual([
+      'arn:aws:apigateway:us-east-1::/apis/*/stages',
+      'arn:aws:apigateway:us-east-1::/apis/*/stages/*',
+    ]);
+    expect(s?.Condition).toEqual({
+      StringEquals: { 'aws:RequestTag/Project': PROJECT_TAG_VALUE, 'aws:ResourceTag/Project': PROJECT_TAG_VALUE },
+    });
   });
 });
 
