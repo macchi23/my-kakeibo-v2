@@ -33,6 +33,8 @@
 | 0 | `intro.md` | Go とは。Python / PHP との違い、プログラムの形、`go` コマンド、エラーメッセージの読み方 |
 | 1 | `basics.md` | module / package、公開、型、ゼロ値、struct とメソッド、エラー、slice / map、テスト（L1 の前） |
 
+| 2 | `l2-memory.md` | map の続き（nil・入れ子・make）、ポインタと値のコピー、`sync.Mutex` と `defer`、`errors.Is`、map の順番と並べ替え、暗黙のインターフェース（L2 の前） |
+
 （以降は各ステップの直前に足す）
 
 ## 虫食いの形

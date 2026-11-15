@@ -30,7 +30,8 @@
 | 書き換えるメソッド | `self.name = ...` | `$this->name = ...` | ポインタレシーバ `func (a *Account) Rename(n string)` |
 | コンストラクタ | `__init__` | `__construct` | 無い。`NewAccount(...)` という普通の関数を作る慣習 |
 | 継承 | `class B(A):` | `class B extends A` | 無い。必要なら struct の埋め込み（この家計簿では使わない） |
-| インターフェース | `Protocol`（ダックタイピング） | `implements` を書く | 書かない。メソッドがそろっていれば満たす（L3 で） |
+| インターフェース | `Protocol`（ダックタイピング） | `implements` を書く | 書かない。メソッドがそろっていれば満たす（L2 の `l2-memory.md` 6 節） |
+| 書き換えるメソッド・コピーしてはいけない型 | - | - | ポインタレシーバ `func (m *Memory) ...`（`sync.Mutex` を持つ型など） |
 | JSON のキー名 | `dict` のキーそのまま | 配列のキーそのまま | struct タグ `` `json:"name"` ``（フィールドは大文字で始める） |
 
 ## エラー
@@ -42,6 +43,22 @@
 | 種類で分ける | `except NotFoundError:` / `isinstance(e, ...)` | `catch (NotFoundException $e)` | `errors.Is(err, ErrNotFound)` / `errors.As(err, &ve)` |
 | 包む | `raise X("x") from e` | `new Exception("x", 0, $e)` | `fmt.Errorf("x: %w", err)` |
 | 後始末 | `finally:` / `with` | `finally` | `defer f.Close()` |
+| 決まったエラー | `class NotFoundError(Exception)` | `class NotFoundException extends Exception` | `var ErrNotFound = errors.New("not found")` |
+
+## 値・参照・並行処理（L2 から）
+
+| やりたいこと | Python | PHP | Go |
+|---|---|---|---|
+| オブジェクトの代入 | `b = a`（同じものを指す） | `$b = $a`（オブジェクトは同じものを指す） | `b := a`（struct は中身がコピーされる） |
+| 同じものを指す | （最初から参照） | （オブジェクトは最初から参照） | ポインタ `p := &a`、型は `*T` |
+| 参照の先を読む | - | - | `*p`（struct のフィールドは `p.Name` でそのまま読める） |
+| 浅いコピーの落とし穴 | `copy.copy` は中のリストを共有 | `clone` は中のオブジェクトを共有 | struct をコピーしても中のポインタ（`*time.Time` など）は共有 |
+| 鍵（排他） | `with lock:`（`threading.Lock`） | （通常は使わない） | `mu.Lock(); defer mu.Unlock()`（`sync.Mutex`） |
+| 空の dict を作る | `{}` / `dict()` | `[]` | `map[K]V{}` / `make(map[K]V)` |
+| 宣言だけの dict | - | - | `var m map[K]V` は nil。読むのは安全、書くと panic |
+| dict の順番 | 挿入順が保たれる | 挿入順が保たれる | 毎回ばらばら。並べたいなら `slices.Sorted(maps.Keys(m))` |
+| 並べ替え | `sorted(xs, key=lambda a: a.id)` | `usort($xs, fn($a, $b) => $a->id <=> $b->id)` | `slices.SortFunc(xs, func(a, b T) int { return cmp.Compare(a.ID, b.ID) })` |
+| その場の関数 | `lambda a: ...`（1 式） | `fn($a) => ...` / `function ($a) { ... }` | `func(a T) int { ... }`（複数行書ける） |
 
 ## コレクション
 
