@@ -2,13 +2,13 @@
 
 P1 の最初のステップ（L1: `internal/kakeibo` の型と Validate）を書くのに要ることだけを扱う。
 `net/http`、`context`、`sync.Mutex` などは、使うステップの直前に別のファイルで扱う。
-TypeScript との対応は [`ts-to-go.md`](ts-to-go.md) に表でまとめている。
+Go がどんな言語かは [`intro.md`](intro.md) を先に読む。Python / PHP との対応は [`python-to-go.md`](python-to-go.md) に表でまとめている。
 
 ## 1. module と package
 
 ```
 backend/
-  go.mod                  ← module の宣言。module = 依存の単位（npm の package.json に近い）
+  go.mod                  ← module の宣言。module = 依存の単位（Python の pyproject.toml、PHP の composer.json に近い）
   internal/kakeibo/       ← package kakeibo。ディレクトリ 1 つ = package 1 つ
     account.go
     category.go
@@ -16,13 +16,13 @@ backend/
 
 - `go.mod` の 1 行目の `module github.com/macchi23/my-kakeibo-v2/backend` が import パスの先頭になる。
   ほかの package からは `import "github.com/macchi23/my-kakeibo-v2/backend/internal/kakeibo"` で読み込み、`kakeibo.Account` のように **package 名.名前** で使う
-- 同じディレクトリのファイルは、すべて同じ package になる。ファイルをまたいでも、import なしで互いの名前を使える（TS のファイル単位のモジュールとは違う）
+- 同じディレクトリのファイルは、すべて同じ package になる。ファイルをまたいでも、import なしで互いの名前を使える（Python の「ファイル 1 つ = モジュール 1 つ」とは違う。Go はディレクトリ単位）
 - `internal/` の下は、この module の外から import できない（Go のツールが強制する）。外に見せない実装を置く場所
 
 ## 2. 公開・非公開は「先頭の文字」で決まる
 
 ```go
-type Account struct { ... }   // 大文字で始まる → package の外から見える（TS の export）
+type Account struct { ... }   // 大文字で始まる → package の外から見える（PHP の public に近い）
 func userPK(u UserID) string  // 小文字で始まる → package の中だけ
 ```
 
@@ -48,7 +48,9 @@ var b int64 = a      // コンパイルエラー。Yen と int64 は混ぜられ
 var c int64 = int64(a) // 明示的に変換すれば OK
 ```
 
-TS の `type Yen = number` は単なる別名なので混ぜられるが、Go の `type Yen int64` は別の型になる。
+Python の `Yen = int` は単なる別名なので `int` と混ぜられるが、Go の `type Yen int64` は別の型になる。
+（`int64` の 64 は桁数ではなくビット数。およそ ±922 京まで入る。`100` を入れられないわけではない。上の 47 行目が
+エラーになるのは、値の大きさではなく「`Yen` 型の値を `int64` 型の変数に入れようとした」から）
 「userId を渡すべき所に口座 ID を渡す」ような取り違えを、コンパイラが止めてくれる。
 
 **列挙型は無い。** 名前付きの型と定数で表す。
@@ -135,7 +137,7 @@ Go の string は UTF-8 のバイト列。`len` はバイト数を返すので�
 ## 8. slice と map と for
 
 ```go
-cats := []Category{}          // slice（TS の配列に近い。長さは可変）
+cats := []Category{}          // slice（Python の list に近い。ただし要素の型は 1 つに決まる）
 cats = append(cats, c)        // 追加。戻り値を受け取り直すのを忘れない
 
 for i, c := range cats {      // インデックスと要素。要らない方は _ にする
@@ -143,7 +145,7 @@ for i, c := range cats {      // インデックスと要素。要らない方�
 }
 for _, c := range cats { ... }
 
-seen := map[string]bool{}     // map（TS の Map / Record に近い）
+seen := map[string]bool{}     // map（Python の dict、PHP の連想配列に近い）
 seen["食料品"] = true
 if seen[name] { ... }         // 無いキーはゼロ値（false）が返る
 ```
