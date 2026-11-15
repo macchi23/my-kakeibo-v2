@@ -24,6 +24,8 @@ export interface ApiProps {
   userPoolClient: IUserPoolClient;
   // false のとき HTTP API 一式を作らない（deploy を 2 回に分ける）
   withHttpApi: boolean;
+  // false のとき既定ステージを作らない（API を作り直した直後、ポリシーに新しい API ID を埋める前の段）
+  withHttpApiStage: boolean;
 }
 
 // アクセストークンだけを通す。ID トークンにはこのスコープが無いので API Gateway が拒否する
@@ -114,7 +116,10 @@ export class Api extends Construct {
 
     if (!props.withHttpApi) return;
 
-    const httpApi = new HttpApi(this, 'HttpApi', { apiName: HTTP_API_NAME });
+    const httpApi = new HttpApi(this, 'HttpApi', {
+      apiName: HTTP_API_NAME,
+      createDefaultStage: props.withHttpApiStage,
+    });
     this.httpApi = httpApi;
 
     const integration = new HttpLambdaIntegration('LambdaIntegration', this.function);
@@ -139,7 +144,9 @@ export class Api extends Construct {
     }
 
     // L2 にスロットリングのプロップが無いのでエスケープハッチで設定する
-    const stage = httpApi.defaultStage?.node.defaultChild as CfnStage;
-    stage.defaultRouteSettings = { throttlingRateLimit: THROTTLING_RATE_LIMIT, throttlingBurstLimit: THROTTLING_BURST_LIMIT };
+    if (httpApi.defaultStage) {
+      const stage = httpApi.defaultStage.node.defaultChild as CfnStage;
+      stage.defaultRouteSettings = { throttlingRateLimit: THROTTLING_RATE_LIMIT, throttlingBurstLimit: THROTTLING_BURST_LIMIT };
+    }
   }
 }

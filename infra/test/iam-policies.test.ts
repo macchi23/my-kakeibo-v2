@@ -41,7 +41,8 @@ const allActions = (f: string, effect: 'Allow' | 'Deny') =>
 const stripSpaces = (t: string) => t.replace(/\s/g, '');
 const globToRegExp = (g: string) => new RegExp(`^${g.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`, 'i');
 const grants = (f: string, action: string) => allActions(f, 'Allow').filter((g) => globToRegExp(g).test(action));
-const ROLE_ARN = `arn:aws:iam::*:role${ROLE_PATH}*`;
+const HTTP_API_ID_PLACEHOLDER = '__HTTP_API_ID__';
+const ROLE_ARN =`arn:aws:iam::*:role${ROLE_PATH}*`;
 const BOUNDARY_ARN = `arn:aws:iam::\${aws:PrincipalAccount}:policy/${PERMISSIONS_BOUNDARY_NAME}`;
 const PROJECT_MARKER = /my-kakeibo-v2|kakeibov2|MyKakeiboV2/;
 const isTagValue = (s: Statement, key: string) => list(s.Condition?.StringEquals?.[key] ?? []).join() === PROJECT_TAG_VALUE;
@@ -198,11 +199,122 @@ describe('ApiGatewayTagProjectStage', () => {
     expect(s?.Effect).toBe('Allow');
     expect(s?.Action).toBe('apigateway:TagResource');
     expect(list(s?.Resource ?? []).sort()).toEqual([
-      'arn:aws:apigateway:us-east-1::/apis/*/stages',
-      'arn:aws:apigateway:us-east-1::/apis/*/stages/*',
+      `arn:aws:apigateway:us-east-1::/apis/${HTTP_API_ID_PLACEHOLDER}/stages`,
+      `arn:aws:apigateway:us-east-1::/apis/${HTTP_API_ID_PLACEHOLDER}/stages/*`,
     ]);
     expect(s?.Condition).toEqual({
       StringEquals: { 'aws:RequestTag/Project': PROJECT_TAG_VALUE, 'aws:ResourceTag/Project': PROJECT_TAG_VALUE },
+    });
+  });
+});
+
+describe('cfn-exec-app-policy.json の API ID（ステージの操作は自 API に固定）', () => {
+  const f = 'cfn-exec-app-policy.json';
+  const apiPrefix = 'arn:aws:apigateway:us-east-1::/apis/';
+  const apiGatewayAllows = () => execPolicies.flatMap((x) => allowed(x)).filter((s) => list(s.Action).some((a) => a.startsWith('apigateway:')));
+  const stageSids = ['ApiGatewayTagProjectStage', 'ApiGatewayManageProjectStage'];
+
+  // IAM の Resource・Action の照合。* は任意長、? は任意の 1 文字。${*} ${?} ${$} は文字どおりの 1 文字。
+  // Action 用の globToRegExp とは ? の扱いが違うので別に持つ。Action は大文字小文字を区別しない、Resource は区別する
+  const iamToRegExp = (g: string, ignoreCase: boolean) => {
+    const re = g
+      .split(/(\$\{[*?$]\}|\*|\?)/)
+      .map((p) => {
+        if (/^\$\{[*?$]\}$/.test(p)) return p[2].replace(/[$*?]/g, '\\$&');
+        if (p === '*') return '.*';
+        if (p === '?') return '.';
+        return p.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+      })
+      .join('');
+    return new RegExp(`^${re}$`, ignoreCase ? 'i' : '');
+  };
+  const resourceToRegExp = (g: string) => iamToRegExp(g, false);
+  // 実行ロールに付く 2 ファイルの Allow を合わせて照合する
+  type Doc = { Statement: Statement[] };
+  const allowsOf = (all: Doc[], action: string, arn: string) =>
+    all
+      .flatMap((d) => d.Statement)
+      .filter(
+        (s) =>
+          s.Effect === 'Allow' &&
+          list(s.Action).some((a) => iamToRegExp(a, true).test(action)) &&
+          list(s.Resource).some((r) => resourceToRegExp(r).test(arn)),
+      )
+      .map((s) => s.Sid);
+  const withId = (id: string): Doc[] =>
+    execPolicies.map((x) => JSON.parse(raw[x].replaceAll(HTTP_API_ID_PLACEHOLDER, id)) as Doc);
+
+  it('/apis/ の次の区画は ?????????? かプレースホルダーだけで、プレースホルダーはステージの 2 文に計 4 回', () => {
+    const segs = apiGatewayAllows()
+      .flatMap((s) => list(s.Resource))
+      .filter((r) => r.startsWith(apiPrefix))
+      .map((r) => r.slice(apiPrefix.length).split('/')[0]);
+    expect(segs.length).toBeGreaterThan(0);
+    for (const seg of segs) expect(['??????????', HTTP_API_ID_PLACEHOLDER]).toContain(seg);
+
+    const withPlaceholder = docs[f].Statement.filter((s) => list(s.Resource).some((r) => r.includes(HTTP_API_ID_PLACEHOLDER)));
+    expect(withPlaceholder.map((s) => s.Sid).sort()).toEqual([...stageSids].sort());
+    const count = withPlaceholder.flatMap((s) => list(s.Resource)).filter((r) => r.includes(HTTP_API_ID_PLACEHOLDER)).length;
+    expect(count).toBe(4);
+    expect(raw[f].split(HTTP_API_ID_PLACEHOLDER).length - 1).toBe(4);
+  });
+
+  it('プレースホルダーが ${ } で囲まれていない（ポリシー変数になるため）', () => {
+    expect(raw[f]).not.toContain(`\${${HTTP_API_ID_PLACEHOLDER}`);
+    expect(raw[f]).not.toMatch(new RegExp(`\\$\\{[^}"]*${HTTP_API_ID_PLACEHOLDER}`));
+  });
+
+  it('照合関数: * は任意長、? は任意の 1 文字、${*} ${?} ${$} は文字どおり', () => {
+    expect(resourceToRegExp('a/*/c').test('a/xx/yy/c')).toBe(true);
+    expect(resourceToRegExp('a/??/c').test('a/xy/c')).toBe(true);
+    expect(resourceToRegExp('a/??/c').test('a/x/c')).toBe(false);
+    expect(resourceToRegExp('a/${*}').test('a/*')).toBe(true);
+    expect(resourceToRegExp('a/${*}').test('a/xyz')).toBe(false);
+    expect(resourceToRegExp('a/${?}').test('a/?')).toBe(true);
+    expect(resourceToRegExp('a/${?}').test('a/x')).toBe(false);
+    expect(resourceToRegExp('a/${$}').test('a/$')).toBe(true);
+    expect(resourceToRegExp('a/b.c').test('a/bxc')).toBe(false);
+    expect(iamToRegExp('apigateway:P*', true).test('apigateway:POST')).toBe(true);
+    expect(iamToRegExp('apigateway:*Resource', true).test('apigateway:TagResource')).toBe(true);
+    expect(iamToRegExp('apigateway:POS?', true).test('apigateway:post')).toBe(true);
+  });
+
+  // 変更前のポリシー（/apis/*）なら、これらはすべて一致した
+  describe('他 API の ID に一致する Allow が無い', () => {
+    const doc = withId('abcdefghij');
+    const other = 'zyxwvutsrq';
+    const arns = [
+      `/apis/${other}/stages`,
+      `/apis/${other}/stages/$default`,
+      `/apis/${other}/stages/%24default`,
+      `/apis/${other}/stages/routes/accesslogsettings`,
+      `/apis/${other}/stages/x/routesettings/GET%20%2Froutes`,
+    ].map((p) => `arn:aws:apigateway:us-east-1::${p}`);
+    const actions = ['GET', 'POST', 'PATCH', 'DELETE', 'TagResource'].map((a) => `apigateway:${a}`);
+    for (const action of actions) {
+      for (const arn of arns) {
+        it(`${action} ${arn}`, () => {
+          expect(allowsOf(doc, action, arn)).toEqual([]);
+        });
+      }
+    }
+  });
+
+  describe('自 API の操作は許可される（漏れの回帰防止）', () => {
+    const doc = withId('abcdefghij');
+    const base = 'arn:aws:apigateway:us-east-1::/apis/abcdefghij';
+    const cases: [string, string][] = [];
+    for (const a of ['GET', 'PATCH', 'DELETE']) cases.push([`apigateway:${a}`, base]);
+    for (const c of ['routes', 'integrations', 'authorizers']) {
+      cases.push(['apigateway:POST', `${base}/${c}`]);
+      for (const a of ['GET', 'PATCH', 'DELETE']) cases.push([`apigateway:${a}`, `${base}/${c}/x1`]);
+    }
+    for (const a of ['POST', 'GET', 'PATCH', 'DELETE']) {
+      cases.push([`apigateway:${a}`, `${base}/stages`], [`apigateway:${a}`, `${base}/stages/$default`]);
+    }
+    cases.push(['apigateway:TagResource', `${base}/stages`]);
+    it.each(cases)('%s %s', (action, arn) => {
+      expect(allowsOf(doc, action, arn).length).toBeGreaterThan(0);
     });
   });
 });
@@ -364,5 +476,14 @@ describe('cfn-exec-policy.json の SSM', () => {
   it('budget-email のパラメータ名が BUDGET_EMAIL_PARAMETER', () => {
     const arns = resourcesOf('cfn-exec-policy.json').filter((r) => r.includes(':parameter/my-kakeibo-v2/'));
     expect(arns.map((a) => a.split(':parameter')[1])).toEqual([BUDGET_EMAIL_PARAMETER]);
+  });
+});
+
+describe('docs/setup.md', () => {
+  // cfn-exec-app の JSON を版の更新に直接渡すと、プレースホルダーのまま反映される（ID を埋めるスクリプトを使う）
+  it('cfn-exec-app を create-policy-version に直接渡す記述が無い', () => {
+    const text = readFileSync(new URL('../../docs/setup.md', import.meta.url), 'utf-8').replace(/\\\n\s*/g, ' ');
+    const offenders = text.split('\n').filter((l) => l.includes('aws iam create-policy-version') && /cfn-exec-app/.test(l));
+    expect(offenders).toEqual([]);
   });
 });

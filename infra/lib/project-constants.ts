@@ -20,6 +20,8 @@ export const LOG_GROUP_NAME = '/aws/lambda/my-kakeibo-v2-api';
 export const HTTP_API_NAME = 'my-kakeibo-v2-api';
 // deploy を 2 回に分けるための context。false のとき HTTP API を作らない
 export const WITH_HTTP_API_CONTEXT_KEY = 'kakeibo:withHttpApi';
+// API の作り直しで ID が変わると、ポリシーに ID を埋めるまでステージを作れない。false のときステージを作らない（API だけを先に作る）
+export const WITH_HTTP_API_STAGE_CONTEXT_KEY = 'kakeibo:withHttpApiStage';
 // 既定ルートの設定が「ルートごと」に効くか一次資料で確かめられなかったため、ルートごとと仮定して絞る（12 ルートで最大 24 rps）
 export const THROTTLING_RATE_LIMIT = 2;
 export const THROTTLING_BURST_LIMIT = 10;

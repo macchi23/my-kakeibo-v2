@@ -94,6 +94,8 @@ run_shell() {
   step "bash -n" bash_syntax
   # shellcheck disable=SC2046
   step shellcheck shellcheck -S warning $(shell_files)
+  need jq
+  step "script tests" bash scripts/test_apply_cfn_exec_app_policy.sh
 }
 
 run_hooks() {

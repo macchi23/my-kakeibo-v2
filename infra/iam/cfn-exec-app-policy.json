@@ -151,12 +151,31 @@
       "Effect": "Allow",
       "Action": "apigateway:TagResource",
       "Resource": [
-        "arn:aws:apigateway:us-east-1::/apis/*/stages",
-        "arn:aws:apigateway:us-east-1::/apis/*/stages/*"
+        "arn:aws:apigateway:us-east-1::/apis/__HTTP_API_ID__/stages",
+        "arn:aws:apigateway:us-east-1::/apis/__HTTP_API_ID__/stages/*"
       ],
       "Condition": {
         "StringEquals": {
           "aws:RequestTag/Project": "my-kakeibo-v2",
+          "aws:ResourceTag/Project": "my-kakeibo-v2"
+        }
+      }
+    },
+    {
+      "Sid": "ApiGatewayManageProjectStage",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET",
+        "apigateway:POST",
+        "apigateway:PATCH",
+        "apigateway:DELETE"
+      ],
+      "Resource": [
+        "arn:aws:apigateway:us-east-1::/apis/__HTTP_API_ID__/stages",
+        "arn:aws:apigateway:us-east-1::/apis/__HTTP_API_ID__/stages/*"
+      ],
+      "Condition": {
+        "StringEquals": {
           "aws:ResourceTag/Project": "my-kakeibo-v2"
         }
       }
@@ -170,7 +189,17 @@
         "apigateway:PATCH",
         "apigateway:DELETE"
       ],
-      "Resource": "arn:aws:apigateway:us-east-1::/apis/*",
+      "Resource": [
+        "arn:aws:apigateway:us-east-1::/apis/??????????",
+        "arn:aws:apigateway:us-east-1::/apis/??????????/routes",
+        "arn:aws:apigateway:us-east-1::/apis/??????????/routes/*",
+        "arn:aws:apigateway:us-east-1::/apis/??????????/integrations",
+        "arn:aws:apigateway:us-east-1::/apis/??????????/integrations/*",
+        "arn:aws:apigateway:us-east-1::/apis/??????????/authorizers",
+        "arn:aws:apigateway:us-east-1::/apis/??????????/authorizers/*",
+        "arn:aws:apigateway:us-east-1::/apis/??????????/deployments",
+        "arn:aws:apigateway:us-east-1::/apis/??????????/deployments/*"
+      ],
       "Condition": {
         "StringEquals": {
           "aws:ResourceTag/Project": "my-kakeibo-v2"

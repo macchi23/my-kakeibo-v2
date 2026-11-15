@@ -87,6 +87,19 @@ CloudFormation に何でも作らせられる（他 PJ のリソースにも手�
 - ポリシーが名前で絞るので、Budget 名を固定した（`my-kakeibo-v2-monthly-v1`）。名前と通知設定はどちらも作成後に変えられず、変えると置換になる。
   同じ名前のまま通知を変えると、置換で新しい Budget を先に作るときに名前が重複して失敗する。そこで、通知先やしきい値を変えるときは末尾の版を上げる（P0 の cost-reviewer の指摘）
 - 初回デプロイで AccessDenied が出たら、スタックイベントで足りない操作を確かめて版を上げる（許可が足りずに止まる方向なので安全側）
+- API Gateway のステージの操作は自 API の ID に固定する（2026-11-15 にユーザーが決定）。ステージの作成では ResourceTag 条件が作成リクエストのタグで評価され、
+  Project タグの無い他 PJ 相当の API の下に、自スタックからタグ付きのステージを作る deploy が成功してしまった。
+  そこで `cfn-exec-app-policy.json` のステージの Resource を `/apis/<自 API の ID>/stages[/*]` にし、`ApiGatewayManageProjectHttpApi` は `/apis/??????????` 配下の子リソースの列挙でステージにかからないようにした。
+  ID はリポジトリに置かず（`__HTTP_API_ID__`）、反映時に埋める。代償: API を作り直すたびにポリシーの更新が要り、deploy が 3 段になる（`docs/setup.md` の「API を作り直すとき」）
+- 管理者権限（`default`）での反映は、GitHub の main に push 済みの内容だけに限る（`git show refs/remotes/origin/main:… | bash -s` で実行し、JSON も fetch した main から取る）。
+  作業ツリーは Claude を含む書き込める者が改ざんでき、HEAD との一致や push 済みの検査も `assume-unchanged` や `update-ref` ですり抜けられたため。
+  hook（guard-deploy）による実行の遮断はベストエフォートで、悪意のある書き方をすべては防げない。
+  最後の守りは「反映されるのは push 済み（レビュー済み）の内容だけ」であることと、ユーザーが差分を見て `y` で確認すること
+- 手元の `.git` も同じく書き換えられ（`git replace`、fetch の設定）、`git show … | bash` が読むスクリプト自体を差し替えられる。そこで反映は、固定の URL から一時ディレクトリへ
+  clone し直し、git の global / system の設定と replace を切り離して実行する（手順は `setup.md`）
+- それでも、Claude と同じユーザーで `default` のログインセッションが使える間は、hook の文字列の判定（`"aws" iam …` のような引用符ですり抜ける）が実質の境界になる。
+  これ以上 hook を強くするのはいたちごっこなので、運用で塞ぐ: `default` には管理者の作業をする間だけログインし、終わったら `aws logout --profile default` する（2026-11-15 にユーザーが決定）。
+  hook の判定方式の見直しは別ステップ（台帳）
 
 **人（`my-kakeibo-v2`）には deploy-role と lookup-role を使わせない。** deploy-role は CloudFormation の更新・削除を `Resource: "*"` で持ち、
 CloudFormation はスタックに紐づく実行ロールを PassRole の有無に関係なく使う。deploy-role を引き受けられると、他 PJ の CDK スタックを

@@ -275,6 +275,29 @@ describe('API', () => {
     expect(ids(off)).toEqual(ids(api));
   });
 
+  it.each(['false', false])('withHttpApiStage=%s のときステージが無く、Api・Route・ApiUrl はある', (v) => {
+    const t = Template.fromStack(
+      createApp({ context: testContext({ 'kakeibo:withHttpApiStage': v }) }).stack,
+    );
+    t.resourceCountIs('AWS::ApiGatewayV2::Stage', 0);
+    t.resourceCountIs('AWS::ApiGatewayV2::Api', 1);
+    t.resourceCountIs('AWS::ApiGatewayV2::Route', 12);
+    t.hasOutput('ApiUrl', {});
+  });
+
+  it('既定ではステージがあり、論理 ID が変わらない', () => {
+    api.resourceCountIs('AWS::ApiGatewayV2::Stage', 1);
+    expect(Object.keys(api.findResources('AWS::ApiGatewayV2::Stage'))).toEqual(['ApiHttpApiDefaultStageE708EF42']);
+  });
+
+  it('withHttpApiStage の true / false で Api・Route・Integration・Authorizer の論理 ID が一致する（段 3 で API が置換されない）', () => {
+    const types = ['AWS::ApiGatewayV2::Api', 'AWS::ApiGatewayV2::Route', 'AWS::ApiGatewayV2::Integration', 'AWS::ApiGatewayV2::Authorizer'];
+    const ids = (t: Template) => types.map((type) => Object.keys(t.findResources(type)).sort());
+    const off = Template.fromStack(createApp({ context: testContext({ 'kakeibo:withHttpApiStage': false }) }).stack);
+    expect(ids(off)).toEqual(ids(api));
+    for (const group of ids(api)) expect(group.length).toBeGreaterThan(0);
+  });
+
   it('LogGroup', () => {
     api.hasResource('AWS::Logs::LogGroup', {
       DeletionPolicy: 'Delete',

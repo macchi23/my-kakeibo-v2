@@ -3,7 +3,7 @@ import { Construct } from 'constructs';
 import { Api } from './api';
 import { Auth } from './auth';
 import { ProjectBudget } from './budget';
-import { WITH_HTTP_API_CONTEXT_KEY } from './project-constants';
+import { WITH_HTTP_API_CONTEXT_KEY, WITH_HTTP_API_STAGE_CONTEXT_KEY } from './project-constants';
 
 export class KakeiboStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -14,10 +14,12 @@ export class KakeiboStack extends Stack {
 
     // CLI の -c は文字列で渡る。'false' と false の両方を false と扱う
     const withHttpApi = String(this.node.tryGetContext(WITH_HTTP_API_CONTEXT_KEY)) !== 'false';
+    const withHttpApiStage = String(this.node.tryGetContext(WITH_HTTP_API_STAGE_CONTEXT_KEY)) !== 'false';
     const api = new Api(this, 'Api', {
       userPool: auth.userPool,
       userPoolClient: auth.userPoolClient,
       withHttpApi,
+      withHttpApiStage,
     });
 
     // Output の論理 ID を固定するため Construct の外（スタック直下）で作る

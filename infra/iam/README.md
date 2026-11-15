@@ -22,6 +22,7 @@ JSON が CDK の実体（定数・リソース型）と食い違わないこと�
 - 条件を外して他 PJ に届く Allow は足さない。AccessDenied は権限を広げずに止めて相談する
 - P1 のリソースは名前の接頭辞 `my-kakeibo-v2-` で絞る。作成は `aws:RequestTag/Project`、作成後は名前の接頭辞（API Gateway はリソースタグ）
 - 例外として、HTTP API の作成時だけ、仮 ARN（`/tags/arn%3A…%2Fv2%2Fapis%2F*`）への `apigateway:POST` を `aws:RequestTag/Project` だけで許す（観測した事実は AccessDenied のエラー文のリソースまで。作成前の事前認可が仮 ARN に対して行われる、という理由は推測。実在の API は `/apis/{id}` なので既存 API には当たらない想定だが、これも Service Reference の ARN 形式が根拠で、TagResource が `/v2/apis/{id}` の形を受け付けないかは未確認）。末尾は `${*}`（文字どおりの `*`。生の `*` だと `/v2/apis/{任意の ID}` に合致する。`Version` が 2012-10-17 であること）。タグを後から変える・消す更新は拒否されるので、タグを足す変更はポリシーの見直しとセットにする
+- ステージの操作は自 API の ID に固定する（`cfn-exec-app-policy.json` の `__HTTP_API_ID__` を反映時に埋める。ID はリポジトリに置かない）。理由: ステージの作成では ResourceTag 条件が作成リクエストのタグで評価され、他 PJ の API の下にステージを作れた（2026-11-15 に実機で確認）。`ApiGatewayManageProjectHttpApi` は `??????????`（API ID は 10 文字）で API 本体と子リソース（routes / integrations / authorizers / deployments）を列挙し、ステージを含めない。プレースホルダーは `${...}` で囲まない（ポリシー変数になる）。API を作り直すと ID が変わるので、ポリシーの更新が要る（`docs/setup.md` の「API を作り直すとき」）
 - IAM ロールは path `/my-kakeibo-v2/` 配下かつ boundary 付きでだけ作れる。boundary は deploy の前に作っておく（ロールの作成条件がその ARN を要求するため）
 
 ## 人は deploy-role / lookup-role を使わない
@@ -40,6 +41,7 @@ deploy-role は全スタックの CloudFormation 操作を持ち、他プロジ�
 - exec role の IAM 部分（`cfn-exec-policy.json`）: path `/my-kakeibo-v2/` 配下かつ boundary 付きでのみ CreateRole 等を許可、PassRole は lambda のみ、boundary 外し・ポリシー書き換えの Deny
 - exec role のアプリ部分（`cfn-exec-app-policy.json`）。`DeleteTable` は持たせない（テーブルは RETAIN）
 - HTTP API の作成時のタグ付け（`cfn-exec-app-policy.json`）: 仮 ARN への `apigateway:POST`（`ApiGatewayTagOnCreateHttpApi`）と、Stage への `apigateway:TagResource`（`ApiGatewayTagProjectStage`。RequestTag と ResourceTag の両方が条件）
+- ステージの操作を自 API の ID に固定（`ApiGatewayTagProjectStage` と `ApiGatewayManageProjectStage` の Resource が `/apis/__HTTP_API_ID__/stages[/*]`）。`ApiGatewayManageProjectHttpApi` は `/apis/??????????` 配下の子リソースの列挙でステージを含めない
 - 権限セット: プロジェクトのロググループの読み取り、Lambda・DynamoDB の読み取り、リソースのインポートの Deny
 
 `cdk gc` は全スタックのテンプレートを読むので権限セットには入れず、管理者の IAM ユーザー（`default` プロファイル）で実行する。

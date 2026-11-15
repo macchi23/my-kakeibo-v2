@@ -48,6 +48,7 @@
    - 出力に AdministratorAccess の警告が出ず、`my-kakeibo-v2-cfn-exec` が付いたことを確かめる
    - `--bootstrap-customer-key` は付けない（KMS の固定費がかかる）
 6. デプロイ（`my-kakeibo-v2`、`infra/`）: `npx cdk diff --profile my-kakeibo-v2 --method=template` → `npx cdk deploy --profile my-kakeibo-v2`
+   - API Gateway を含む段階（P1 以降）の新しいアカウントでは、初回は `-c kakeibo:withHttpApiStage=false` で deploy → 反映スクリプトを push 済みの版で `--apply`（下の「cfn-exec-app の反映」） → context なしで deploy の 3 段にする（下の「P1 の反映」の手順 5）
    - 初回の diff は `--method=template` にする。既定の change set 方式は、スタックが無いと空のスタックを作ってから消そうとし、DeleteStack が無いので消せずに残る
    - deploy-role・lookup role を引き受けられない旨の警告（"Proceeding anyway" など）は想定どおり。人には deploy-role を使わせない（DECISIONS.md の「AWS の権限」）
    - AccessDenied で止まったら、権限を広げて回避せず、下の「P1 の反映」の「AccessDenied が出たとき」に従う
@@ -85,15 +86,14 @@ P0 のあとで、実行ロールのポリシーを 2 本に分け、permissions
 1. ポリシーを作る・更新する（`default`、ルート）
    ```sh
    ACCOUNT=$(aws sts get-caller-identity --profile default --query Account --output text)
-   for f in boundary-policy cfn-exec-app-policy cfn-exec-policy; do
+   for f in boundary-policy cfn-exec-policy; do
      aws accessanalyzer validate-policy --profile default --region us-east-1 \
        --policy-type IDENTITY_POLICY --policy-document "file://infra/iam/${f}.json"
    done
    # boundary を先に作る。cfn-exec の条件が boundary の ARN を参照する
    aws iam create-policy --profile default --policy-name my-kakeibo-v2-boundary \
      --policy-document file://infra/iam/boundary-policy.json --tags Key=Project,Value=my-kakeibo-v2
-   aws iam create-policy --profile default --policy-name my-kakeibo-v2-cfn-exec-app \
-     --policy-document file://infra/iam/cfn-exec-app-policy.json --tags Key=Project,Value=my-kakeibo-v2
+   # cfn-exec-app は API の ID を埋めた一時ファイルで作る・更新する。下の「cfn-exec-app の反映」を使う
    # 既存の cfn-exec は版の更新。版が 5 つなら、既定でない最古の版を先に消す
    aws iam list-policy-versions --profile default --policy-arn "arn:aws:iam::${ACCOUNT}:policy/my-kakeibo-v2-cfn-exec"
    aws iam delete-policy-version --profile default --policy-arn "arn:aws:iam::${ACCOUNT}:policy/my-kakeibo-v2-cfn-exec" --version-id <最古の版>
@@ -103,6 +103,78 @@ P0 のあとで、実行ロールのポリシーを 2 本に分け、permissions
    ```
    - `validate-policy` は ERROR が 0 であること。SUGGESTION・WARNING は内容を読んで判断する
      - 例外: `cfn-exec-app-policy.json` の `apigateway:TagResource`（Sid `ApiGatewayTagProjectStage`）は Service Reference に無い操作なので、`INVALID_ACTION` の ERROR が出うる。実際の deploy では評価されている（2026-11-15）。この 1 件だけ許容し、消すために `apigateway:*` や条件なしの `/tags/*` に置き換えない
+
+   **cfn-exec-app の反映**（`default`、ユーザーが実行。リポジトリのルート）。ステージの操作は自 API の ID に固定していて、`cfn-exec-app-policy.json` の `__HTTP_API_ID__` を反映時に埋める（ID はリポジトリに置かない。理由は `DECISIONS.md` の「AWS の権限」）。
+   cfn-exec-app の JSON を版の更新に直接渡さない（プレースホルダーのまま反映され、ステージの操作が一致しなくなる）。次のスクリプトを、GitHub の main に push 済みの版で実行する。
+   **手元のリポジトリ（`.git`）は使わず、固定の URL から一時ディレクトリへ clone し直して実行する。** 手元の `.git` は Claude を含む書き込める者が
+   `git replace` や fetch の設定で書き換えられ、`git show … | bash` が読むスクリプトそのものを差し替えられるため（P1 の security-reviewer）。
+   どのディレクトリからでも実行できる。`MODE` を空にすると確認だけ（dry-run）、`--apply` にすると確認に通った後で反映する（既定の版として追加）。
+   ```sh
+   MODE=            # 反映するときは MODE=--apply
+   (
+     set -eu
+     export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1
+     D=$(mktemp -d); trap 'rm -rf "$D"' EXIT
+     git -c core.hooksPath=/dev/null -c protocol.allow=never -c protocol.https.allow=always \
+       clone --quiet --no-tags --single-branch --branch main \
+       https://github.com/macchi23/my-kakeibo-v2.git "$D/r"
+     cd "$D/r"
+     git -c core.hooksPath=/dev/null show refs/remotes/origin/main:scripts/apply-cfn-exec-app-policy.sh \
+       | bash -s -- $MODE
+   )
+   ```
+   - スクリプトが最初に表示する「反映元」のコミットハッシュを、GitHub の Web 画面の main の最新コミットと見比べる（ローカルの proxy などによる差し替えに気づくため）
+   - `default` には、この作業の間だけログインし、終わったら `aws logout --profile default` する（下の「管理者の資格情報」）
+   - **作業ツリーのスクリプトや JSON は使わない。反映されるのは GitHub の main に push 済みの内容だけ。** スクリプトも自分で `git fetch origin` し直し、JSON を fetch した `origin/main` のコミットから取る（fetch に失敗したら止まる）。反映元のコミットを最初に表示する
+   - **管理者の資格情報:** `aws login` の資格情報は `~/.aws` に置かれ、同じユーザーとして動く Claude からも使える。hook やスクリプトの検査はベストエフォートなので、
+     本当の境界は「`default` にログインしていない間は、管理者の操作ができない」こと。`default` は管理者の作業をする間だけログインし、終わったらすぐ `aws logout --profile default` する
+   - `origin/main` ではなく `refs/remotes/origin/main` と書く（ローカルにタグやブランチ `origin/main` があると、そちらが優先される）
+   - リポジトリのルート以外で実行した場合と、`origin` の URL（`insteadOf` の書き換え後の値）が本リポジトリでない場合は止まる
+   - プロファイル `default`・リージョン `us-east-1`・スタック `MyKakeiboV2` は固定。ID は `describe-stack-resources` の `AWS::ApiGatewayV2::Api` の `PhysicalResourceId` から取る（スタックの Output は、テンプレートで任意の値にできるので使わない）
+   - 止まる条件: Api がちょうど 1 件でない / ID が `^[a-z0-9]{10}$` でない / `get-api` の Name が `my-kakeibo-v2-api` でない、または `Tags.Project` が `my-kakeibo-v2` でない / プレースホルダーが残る / どれかの文に `NotAction`・`NotResource`・`NotPrincipal` がある / Deny 以外の文の Action に `*` だけや `<service>:*` がある / apigateway の操作を含む文の Sid と Resource の集合が、期待する許可リスト（`/apis`、作成時の仮 ARN、`/apis/<ID>/stages[/*]`、`/apis/??????????` と子リソース）と完全一致しない / `validate-policy` に `apigateway:TagResource` の `INVALID_ACTION` 以外の ERROR がある / 版が 5 つある（既定でない最古の版を消すコマンドを表示して止まる。消すのは手で行う）。反映後は `get-policy-version` で、反映した版が送った内容と一致することを確かめる
+   - 現在の既定の版との差分（`jq -S` で整形した `diff -u`）と `validate-policy` の全 findings を表示し、SECURITY_WARNING があれば止まる。`--apply` は端末からだけで（`/dev/tty` を開けなければ拒否）、差分の表示の後に `[y/N]` を `/dev/tty` から聞く。差分を読んで、意図した変更だけであることを確かめてから `y` を入れる
+   - 新しいアカウントで、ポリシーがまだ無いとき: プレースホルダーのまま作ってよい（ステージの操作だけが一致しない状態で、安全側）。API を作ったあと、スクリプトで ID を埋める
+     ```sh
+     aws iam create-policy --profile default --policy-name my-kakeibo-v2-cfn-exec-app \
+       --policy-document file://infra/iam/cfn-exec-app-policy.json --tags Key=Project,Value=my-kakeibo-v2
+     ```
+   - 旧ポリシー（ステージの Resource が `/apis/*/stages`）を反映していた期間に、穴が使われていないかの確認（`default`、読み取りだけ）。今残っているステージだけでは、作って消したものが見えないので、スタックのイベントと CloudTrail も見る。次はサブシェルで実行する（`set -o pipefail` でパイプの途中の失敗を検出する。取得結果が空のときは止まるので、失敗か本当に 0 件かを確かめる）
+     ```sh
+     (
+       set -euo pipefail
+       API_ID=$(aws cloudformation describe-stack-resources --profile default --region us-east-1 --stack-name MyKakeiboV2 --output json \
+         | jq -r '.StackResources[] | select(.ResourceType == "AWS::ApiGatewayV2::Api") | .PhysicalResourceId')
+       [ -n "$API_ID" ] || { echo "API ID が空。止める"; exit 1; }
+
+       # (a) Project タグが my-kakeibo-v2 でない API に、タグ付きのステージが今残っていないこと（出力が空であること）
+       APIS=$(aws apigatewayv2 get-apis --profile default --region us-east-1 --output json)
+       [ "$(printf '%s' "$APIS" | jq '.Items | length')" -gt 0 ] || { echo "get-apis の結果が空。止めて確かめる"; exit 1; }
+       for ID in $(printf '%s' "$APIS" | jq -r '.Items[] | select((.Tags.Project // "") != "my-kakeibo-v2") | .ApiId'); do
+         aws apigatewayv2 get-stages --profile default --region us-east-1 --api-id "$ID" --output json \
+           | jq -r --arg id "$ID" '.Items[] | select((.Tags.Project // "") == "my-kakeibo-v2") | "\($id) \(.StageName)"'
+       done
+
+       # (b) MyKakeiboV2 の Stage のイベントの ApiId が、自 API の ID と、否定側の確認で使った検証用 API 以外に無いこと
+       EVENTS=$(aws cloudformation describe-stack-events --profile default --region us-east-1 --stack-name MyKakeiboV2 --output json)
+       [ "$(printf '%s' "$EVENTS" | jq '.StackEvents | length')" -gt 0 ] || { echo "スタックのイベントが空。止める"; exit 1; }
+       printf '%s' "$EVENTS" | jq -r '.StackEvents[] | select(.ResourceType == "AWS::ApiGatewayV2::Stage") | .ResourceProperties // empty | fromjson | .ApiId // empty' | sort -u
+       echo "自 API: ${API_ID}"
+
+       # (c) RoleARN に cfn-exec ロールを使うスタックが MyKakeiboV2 だけであること
+       aws cloudformation describe-stacks --profile default --region us-east-1 --output json \
+         | jq -r '.Stacks[] | select((.RoleARN // "") | contains("cdk-kakeibov2-cfn-exec-role")) | .StackName'
+
+       # (d) CloudTrail（必須）: cfn-exec ロールが、自 API 以外の apiId の API Gateway を触っていないこと（直近 90 日分）
+       TRAIL=$(aws cloudtrail lookup-events --profile default --region us-east-1 --output json \
+         --lookup-attributes AttributeKey=EventSource,AttributeValue=apigateway.amazonaws.com)
+       [ "$(printf '%s' "$TRAIL" | jq '.Events | length')" -gt 0 ] || { echo "CloudTrail の結果が空。止めて確かめる"; exit 1; }
+       printf '%s' "$TRAIL" | jq -r --arg id "$API_ID" '.Events[].CloudTrailEvent | fromjson
+         | select((.userIdentity.arn // "") | contains("cdk-kakeibov2-cfn-exec-role"))
+         | select((.requestParameters.apiId // "") != $id)
+         | "\(.eventTime) \(.eventName) \(.requestParameters.apiId // "-")"'
+     )
+     ```
+     期待する結果: (a) は空。(b) は自 API の ID（過去の API の ID を含む）と、否定側の確認で使った検証用 API だけ。(c) は `MyKakeiboV2` だけ。(d) は apiId の無い操作（API の作成など）と、否定側の確認で使った検証用 API だけ。これら以外が出たら、ユーザーに相談する
 2. bootstrap をやり直す（`default`、`infra/`）。付けるポリシーの ARN が 2 本になるため。他のフラグは手順 5 と同じ
    ```sh
    npx cdk bootstrap "aws://${ACCOUNT}/us-east-1" --profile default \
@@ -135,7 +207,24 @@ P0 のあとで、実行ロールのポリシーを 2 本に分け、permissions
    - 上から順に: path 配下 + boundary 付きは 3 アクションとも `allowed`、path 外は 3 アクションとも `implicitDeny`、boundary 無しは `explicitDeny` で `MatchedStatements` が `DenyRoleWithoutProjectBoundary` であること
    - シミュレーターが `${aws:PrincipalAccount}` を解決しないときは、`aws:PrincipalAccount` も `--context-entries` に足す
    - `ConcurrentExecutions` が低い（10 など）と、予約同時実行数（Lambda 単位の上限）を設定できない
-5. deploy は手順 6 と同じ（`my-kakeibo-v2`）。失敗した作成のロールバックで、RETAIN のリソースが残ることがある。残ると再 deploy が同名で衝突する。
+   - ステージの操作の確認（API があり、`cfn-exec-app` に ID を埋めてから。`EXEC` と `REGION_CTX` は上の変数。自 ID の `/stages`・`/stages/$default`・`/routes` への POST / DELETE は `allowed`、他 ID（`zzzzzzzzzz`）の `/stages`・`/stages/$default` は ResourceTag の context を付けても `implicitDeny`）
+     ```sh
+     API_ID=$(aws cloudformation describe-stack-resources --profile default --region us-east-1 --stack-name MyKakeiboV2 --output json \
+       | jq -r '.StackResources[] | select(.ResourceType == "AWS::ApiGatewayV2::Api") | .PhysicalResourceId')
+     for P in "/apis/${API_ID}/stages" "/apis/${API_ID}/stages/\$default" "/apis/${API_ID}/routes" "/apis/zzzzzzzzzz/stages" "/apis/zzzzzzzzzz/stages/\$default"; do
+       aws iam simulate-principal-policy --profile default --policy-source-arn "$EXEC" \
+         --action-names apigateway:POST apigateway:DELETE --resource-arns "arn:aws:apigateway:us-east-1::${P}" \
+         --context-entries "$REGION_CTX" "ContextKeyName=aws:ResourceTag/Project,ContextKeyValues=my-kakeibo-v2,ContextKeyType=string" \
+         --query 'EvaluationResults[].[EvalActionName,EvalResourceName,EvalDecision]' --output text
+     done
+     ```
+5. deploy（`my-kakeibo-v2`、`infra/`）。**新しいアカウント（API がまだ無い）では 3 段で行う。** 初回からプレースホルダーのままのポリシーで全体を deploy すると、Stage の作成で AccessDenied → `ROLLBACK_COMPLETE` になり、RETAIN のテーブルが残る。
+   1. `npx cdk deploy --profile my-kakeibo-v2 -c kakeibo:withHttpApiStage=false`（API と子リソースまで作る）
+   2. 反映スクリプトを push 済みの版で `--apply`（`default`、ユーザー。上の「cfn-exec-app の反映」のコマンド）
+   3. `npx cdk deploy --profile my-kakeibo-v2`（ステージができる）
+
+   既に API があり ID が変わらない更新は、context なしの 1 回でよい。API を作り直すときは下の「API を作り直すとき」。
+   失敗した作成のロールバックで、RETAIN のリソースが残ることがある。残ると再 deploy が同名で衝突する。
    - テーブルは残る。ロググループは `removalPolicy: DESTROY` を指定していれば残らない（CDK の既定は RETAIN）
    - 残っていたら、中身が空であることを確かめ、ユーザーが `default` で削除してから再 deploy する。テーブルは削除保護を外してから消す
      ```sh
@@ -143,7 +232,20 @@ P0 のあとで、実行ロールのポリシーを 2 本に分け、permissions
      aws dynamodb delete-table --profile default --region us-east-1 --table-name my-kakeibo-v2-data-v1
      ```
 
-AccessDenied が出たとき: スタックイベントで拒否された操作を確かめ、該当の JSON を直して版を上げる（上の手順 1 の `create-policy-version`。`cfn-exec` と `cfn-exec-app` のどちらの JSON か、ARN を取り違えない）。
+### API を作り直すとき
+
+対象: HttpApi の論理 ID の変更、ProtocolType の変更、`withHttpApi=false` からの再作成、新しいアカウント（テーブルの版上げは該当しない）。ステージの操作を自 API の ID に固定しているので、新しい API の ID が分かるまでステージを作れない。3 段で行う。
+1. 作り直しを含む変更を `-c kakeibo:withHttpApiStage=false` で deploy する（`my-kakeibo-v2`、`infra/`）。新しい API と子リソースができ、旧ステージと旧 API は cleanup で消える（旧ステージの削除は、ポリシーにある旧 ID で通る）
+2. 反映スクリプトを push 済みの版で `--apply` し、新しい API の ID を埋めて反映する（`default`、ユーザー。上の「cfn-exec-app の反映」のコマンド。ID はスクリプトがスタックのリソースから取る）
+3. context なしで deploy する（ステージができる）
+
+- ステージの Resource の ID を `*` や `??????????` にして回避しない（旧ポリシーの穴が戻る）
+- 段 1 を忘れると Stage の作成で AccessDenied → ロールバック（安全側）
+- スタックを削除する前に、ポリシーの ID が今の API と一致していることを確かめる（不一致だと Stage が DELETE_FAILED になる）
+- API ID が 10 文字でないと、作成直後の GET が `??????????` に合わず拒否される。回復: `cloudformation continue-update-rollback`（`default`）でロールバックを進め、残った API があればユーザーが `default` で削除する
+
+AccessDenied が出たとき: スタックイベントで拒否された操作を確かめ、該当の JSON を直して版を上げる（`cfn-exec` は上の手順 1 の `create-policy-version`。`cfn-exec-app` は JSON の修正を main に push してから、反映スクリプトを push 済みの版で `--apply` する（上の「cfn-exec-app の反映」）。JSON を直接渡すとプレースホルダーのまま反映される。どちらの JSON か、ARN を取り違えない）。
+ステージの Resource の ID を `*` や `??????????` にして回避しない（旧ポリシーの穴が戻る）。
 **権限を広げて回避しない。** 条件を外す、タグ付けの権限を条件なしで足す、といった変更は他 PJ のリソースに届くので、止めてユーザーに相談する。初回 deploy で確かめきれていない点は次のとおり。
 1. （2026-11-15 の deploy で、Route / Integration / Authorizer の作成に ResourceTag 条件が効くことを確認した。Stage は下の 3 番）HTTP API の子リソース（routes / integrations / authorizers / stages / deployments）にリソースタグの条件が効かないとき。V2 の子リソースにタグが継承されるとは文書に書かれていない（I2 の security-reviewer）。
    `withHttpApi=true` は Api と子リソースを 1 回で作るので、子リソースで AccessDenied になるとロールバックで Api も消え、ID が残らない。ここで止めて相談する。
@@ -151,7 +253,8 @@ AccessDenied が出たとき: スタックイベントで拒否された操作�
 2. 各ハンドラーが作成リクエストにタグを含めないとき（`aws:RequestTag/Project` の条件が効かない）
 3. タグ付けの権限（Service Reference に `TagResource` は無い）。2026-11-15 の deploy で、Api の作成時に `/tags/arn%3Aaws%3Aapigateway%3Aus-east-1%3A%3A%2Fv2%2Fapis%2F*`（未作成の仮 ARN）への `apigateway:POST` が評価され、AccessDenied になった。観測した事実はエラー文のリソースまでで、作成前の事前認可が未作成の仮 ARN に対して行われる、という理由は推測。対応として、この仮 ARN だけ（末尾は `${*}` で文字どおりの `*`）に `aws:RequestTag/Project` 条件付きで許可を足した（`ApiGatewayTagOnCreateHttpApi`）。実在の API の ARN は `/apis/{id}` なので既存 API には当たらない想定だが、根拠は Service Reference の ARN 形式で、TagResource が `/v2/apis/{id}` の形を受け付けないかは未確認。
    Service Reference の POST の対象リソースに Tags は載っていないが、V2 の TagResource は `POST /v2/tags/{resource-arn}`（API リファレンス）。Service Reference に無いことは「存在しない」根拠にしない。
-   Stage の作成では `apigateway:TagResource`（Service Reference に載っていない操作）が `/apis/{id}/stages` に対して評価され、AccessDenied になった（Route / Integration / Authorizer は通った）。RequestTag と ResourceTag の両方を条件にした許可を足した（`ApiGatewayTagProjectStage`）。ResourceTag 条件がこの操作で効くかは次の deploy で確かめる（効かなければ AccessDenied で止まる）。条件なしで `/tags/*` を足すと他 PJ の API に `Project` タグを付けて条件を乗っ取れるので、足さずに相談する
+   Stage の作成では `apigateway:TagResource`（Service Reference に載っていない操作）が `/apis/{id}/stages` に対して評価され、AccessDenied になった（Route / Integration / Authorizer は通った）。RequestTag と ResourceTag の両方を条件にした許可を足した（`ApiGatewayTagProjectStage`）。
+   否定側の確認の結果（2026-11-15）: Project タグの無い（他 PJ 相当の）HTTP API の下に、自スタックからタグ付きのステージを作る deploy が成功した。ステージの作成では ResourceTag 条件が作成リクエストのタグで評価されたと見られる。穴だったので、ステージの操作を自 API の ID に固定して塞いだ（上の「API を作り直すとき」と `DECISIONS.md`）。条件なしで `/tags/*` を足すと他 PJ の API に `Project` タグを付けて条件を乗っ取れるので、足さずに相談する
 4. アセットの読み取りで KMS の権限が要るとき（`aws/s3` 管理キーなら要らない想定）
 5. 失敗した作成のロールバックで RETAIN のリソースが残る（上の手順 5）
 
@@ -164,6 +267,10 @@ AccessDenied が出たとき: スタックイベントで拒否された操作�
 | `iam list-policy-versions` / `delete-policy-version` / `create-policy-version` | `default` | `iam:ListPolicyVersions` / `iam:DeletePolicyVersion` / `iam:CreatePolicyVersion`（`--set-as-default` は同じ呼び出し） | 同上（未確認） |
 | `cdk bootstrap` | `default` | `sts:GetCallerIdentity`、`cloudformation:DescribeStacks` / `GetTemplate` / `CreateChangeSet` / `DescribeChangeSet` / `ExecuteChangeSet` / `DescribeStackEvents`、`ssm:GetParameter`（bootstrap バージョン）。スタック内では CloudFormation が IAM ロール・S3 バケットを更新する | 同上（未確認）。中断したら `DescribeStackEvents` で状態を見て同じコマンドを再実行する |
 | `iam simulate-principal-policy` | `default` | `iam:SimulatePrincipalPolicy` | 同上（未確認）。`aws:RequestedRegion` などは自動で埋まらないので `--context-entries` で渡す |
+| `scripts/apply-cfn-exec-app-policy.sh`（push 済みの版を `git show … \| bash -s` で実行） | `default` | `sts:GetCallerIdentity`、`cloudformation:DescribeStackResources`、`apigateway:GET`（`get-api`）、`access-analyzer:ValidatePolicy`、`iam:ListPolicyVersions`、`iam:GetPolicyVersion`（現在の既定の版）。`--apply` では加えて `iam:CreatePolicyVersion`、`iam:GetPolicyVersion`（反映した版） | 同上（未確認）。`--apply` が途中で止まっても、作られた版は既定のまま残る（`get-policy-version` の確認で止まった場合）。再実行は新しい版を足すので、版が 5 つに達したらスクリプトの案内どおり最古を消す |
+| `apigatewayv2 get-apis` / `get-stages`（穴が使われていないかの確認） | `default` | `apigateway:GET`（`/v2/apis`、`/v2/apis/{id}/stages`） | 同上（未確認） |
+| `cloudformation describe-stacks`（RoleARN の確認）/ `describe-stack-events`（Stage のイベントの確認） | `default` | `cloudformation:DescribeStacks` / `cloudformation:DescribeStackEvents` | 同上（未確認） |
+| `cloudtrail lookup-events`（旧ポリシーの穴の確認。必須） | `default` | `cloudtrail:LookupEvents` | 同上（未確認） |
 | `lambda get-account-settings` | `default` | `lambda:GetAccountSettings` | 同上（未確認）。`my-kakeibo-v2` には持たせていない |
 | `cdk deploy` | `my-kakeibo-v2` | 既存の CloudFormation 操作に加え、実行ロールが Lambda / DynamoDB / Logs / API Gateway / IAM の各ハンドラーを呼ぶ | 実 deploy で確かめる（未確認） |
 | `aws logs tail <ロググループ> --follow` | `my-kakeibo-v2` | `logs:FilterLogEvents`（aws-cli 2.34 の `tail` は follow の有無にかかわらず `filter_log_events` だけを呼ぶ） | 通る想定（未確認） |
