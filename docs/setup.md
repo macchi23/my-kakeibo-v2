@@ -144,7 +144,9 @@ P0 のあとで、実行ロールのポリシーを 2 本に分け、permissions
 
 AccessDenied が出たとき: スタックイベントで拒否された操作を確かめ、該当の JSON を直して版を上げる（上の手順 1 の `create-policy-version`。`cfn-exec` と `cfn-exec-app` のどちらの JSON か、ARN を取り違えない）。
 **権限を広げて回避しない。** 条件を外す、タグ付けの権限を条件なしで足す、といった変更は他 PJ のリソースに届くので、止めてユーザーに相談する。初回 deploy で確かめきれていない点は次のとおり。
-1. HTTP API の子リソース（routes / integrations / authorizers / stages / deployments）にリソースタグの条件が効かないとき。相談の案: 先に Api だけを deploy して ID を得て、Resource を `arn:aws:apigateway:us-east-1::/apis/<その ID>/*` に固定する（ID は反映時にシェル変数で埋め、リポジトリには置かない）
+1. HTTP API の子リソース（routes / integrations / authorizers / stages / deployments）にリソースタグの条件が効かないとき。V2 の子リソースにタグが継承されるとは文書に書かれていない（I2 の security-reviewer）。
+   `withHttpApi=true` は Api と子リソースを 1 回で作るので、子リソースで AccessDenied になるとロールバックで Api も消え、ID が残らない。ここで止めて相談する。
+   相談の案: Api だけを作る段を CDK に足して先に deploy し、ID を得て、Resource を `arn:aws:apigateway:us-east-1::/apis/<その ID>/*` に固定する（ID は反映時にシェル変数で埋め、リポジトリには置かない）
 2. 各ハンドラーが作成リクエストにタグを含めないとき（`aws:RequestTag/Project` の条件が効かない）
 3. Stage のハンドラーが `apigateway:TagResource` を要求するとき（Service Reference に `TagResource` は無い。確認済み: タグ付けは `/tags/*` への `apigateway:PUT` / `DELETE`で、POST ではない）。条件なしで足すと他 PJ の API に `Project` タグを付けて条件を乗っ取れるので、足さずに相談する
 4. アセットの読み取りで KMS の権限が要るとき（`aws/s3` 管理キーなら要らない想定）

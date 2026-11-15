@@ -4,13 +4,14 @@ import { Template } from 'aws-cdk-lib/assertions';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../lib/app';
+import { testContext } from './helpers';
 import { PERMISSIONS_BOUNDARY_NAME, ROLE_PATH } from '../lib/project-constants';
 
 const cdkJson = JSON.parse(readFileSync(new URL('../cdk.json', import.meta.url), 'utf-8'));
 
-// 本番スタックには Role が無いので、同じ context と Aspect を持つ app にテスト専用スタックを足して確かめる
+// 本番スタックの Role は Lambda 用だけなので、L1 / L2 の両方を確かめられるよう、同じ context と Aspect を持つ app にテスト専用スタックを足す
 function guardedTemplate(): Template {
-  const { app } = createApp({ context: cdkJson.context });
+  const { app } = createApp({ context: testContext() });
   const s = new Stack(app, 'GuardTest');
   new iam.Role(s, 'L2Role', { assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com') });
   new iam.CfnRole(s, 'L1Role', {

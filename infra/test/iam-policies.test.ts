@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../lib/app';
+import { testContext } from './helpers';
 import {
   BOOTSTRAP_QUALIFIER,
   BUDGET_EMAIL_PARAMETER,
@@ -61,9 +62,22 @@ const hasProjectTagCondition = (s: Statement) => isTagValue(s, 'aws:ResourceTag/
 
 describe('本番スタックのリソース型', () => {
   it('cfn-exec-policy.json が許可しているリソース型だけを使う', () => {
-    const { stack } = createApp({ context: JSON.parse(readFileSync(new URL('../cdk.json', import.meta.url), 'utf-8')).context });
+    const { stack } = createApp({ context: testContext() });
     const types = new Set(Object.values(Template.fromStack(stack).toJSON().Resources).map((r) => (r as { Type: string }).Type));
-    const allowed = new Set(['AWS::Cognito::UserPool', 'AWS::Cognito::UserPoolClient', 'AWS::Budgets::Budget', 'AWS::CDK::Metadata']);
+    const allowed = new Set(['AWS::Cognito::UserPool', 'AWS::Cognito::UserPoolClient', 'AWS::Budgets::Budget',
+      'AWS::CDK::Metadata',
+      'AWS::DynamoDB::Table',
+      'AWS::Logs::LogGroup',
+      'AWS::IAM::Role',
+      'AWS::IAM::Policy',
+      'AWS::Lambda::Function',
+      'AWS::Lambda::Permission',
+      'AWS::ApiGatewayV2::Api',
+      'AWS::ApiGatewayV2::Stage',
+      'AWS::ApiGatewayV2::Integration',
+      'AWS::ApiGatewayV2::Route',
+      'AWS::ApiGatewayV2::Authorizer',
+    ]);
     const unexpected = [...types].filter((t) => !allowed.has(t));
     expect(
       unexpected,
