@@ -26,8 +26,6 @@ func wantValidationField(t *testing.T, err error, field string) {
 }
 
 func TestCategoryInputValidate(t *testing.T) {
-	t.Skip("TODO(L1): 実装したらこの行を消す")
-
 	tests := []struct {
 		name      string
 		in        CategoryInput
@@ -50,8 +48,6 @@ func TestCategoryInputValidate(t *testing.T) {
 }
 
 func TestCheckCategoryConstraints(t *testing.T) {
-	t.Skip("TODO(L1): 実装したらこの行を消す")
-
 	archived := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	cat := func(id, name string, kind CategoryKind, archivedAt *time.Time) Category {
 		return Category{ID: id, Name: name, Kind: kind, ArchivedAt: archivedAt}
@@ -153,8 +149,6 @@ func TestCheckCategoryConstraints(t *testing.T) {
 }
 
 func TestCheckKindUnchanged(t *testing.T) {
-	t.Skip("TODO(L1): 実装したらこの行を消す")
-
 	tests := []struct {
 		name      string
 		current   Category

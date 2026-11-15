@@ -5,6 +5,7 @@ package kakeibo
 
 import (
 	"errors"
+	"fmt"
 )
 
 // ErrNotFound は「対象が無い」を表す。他人の項目も同じ扱い（存在を教えないため、403 ではなく 404 にする）。
@@ -22,7 +23,8 @@ type ValidationError struct {
 // 値レシーバにしているので、ValidationError は「値」で返し（&ValidationError{} にしない）、
 // 判別する側は `var ve kakeibo.ValidationError; errors.As(err, &ve)` と書く。
 func (e ValidationError) Error() string {
-	// TODO(L1): Field があれば "name: 1〜50 文字で入力してください" のように、Field と Message をつないだ文字列を返す。
-	//   ヒント: fmt.Sprintf / Field が空かどうかで分岐
-	panic("TODO(L1)")
+	if e.Field != "" {
+		return fmt.Sprintf("%s: %s", e.Field, e.Message)
+	}
+	return e.Message
 }

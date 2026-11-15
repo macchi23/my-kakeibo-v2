@@ -4,7 +4,9 @@
 package kakeibo
 
 import (
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type CategoryKind string
@@ -42,13 +44,35 @@ type CategoryInput struct {
 	SortOrder   int          `json:"sortOrder"`
 }
 
+// IsValidはCategoryKindが有効かどうか確認する
+func (k CategoryKind) IsValid() bool {
+	switch k {
+	// 有効なものたち
+	case CategoryKindExpense, CategoryKindIncome:
+		return true
+	}
+	// それ以外は無効
+	return false
+}
+
 // Validate は入力単体の検査。
 //   - name: 前後の空白を除いて 1〜50 文字（rune 数）
 //   - description: 0〜200 文字（rune 数）
 //   - kind: EXPENSE か INCOME
 func (in CategoryInput) Validate() error {
 	// TODO(L1): AccountInput.Validate と同じ要領で書く。
-	panic("TODO(L1)")
+	nameRune := utf8.RuneCountInString(strings.TrimSpace(in.Name))
+	descriptionRune := utf8.RuneCountInString(strings.TrimSpace(in.Description))
+	if nameRune < CategoryNameMin || nameRune > CategoryNameMax {
+		return ValidationError{Field: "name", Message: "カテゴリ名は1-50文字にしてください"}
+	}
+	if descriptionRune > CategoryDescriptionMax {
+		return ValidationError{Field: "description", Message: "説明は200文字以内にしてください"}
+	}
+	if !in.Kind.IsValid() {
+		return ValidationError{Field: "kind", Message: "カテゴリの種類（支出・収入）が不正です"}
+	}
+	return nil
 }
 
 // CheckCategoryConstraints は他のカテゴリとの関係で決まる不変条件を検査する。
@@ -62,12 +86,40 @@ func (in CategoryInput) Validate() error {
 // NOTE: 検査と書き込みの間は原子的ではない（同時に 2 件作ると重複しうる）。個人用なので P1 では許容する。
 func CheckCategoryConstraints(existing []Category, c Category) error {
 	// TODO(L1): existing を range で回して、上の 3 つを検査する。
-	panic("TODO(L1)")
+	// c がアーカイブ済み（ArchivedAt != nil）なら、制約の対象外なので nil を返す
+	if c.ArchivedAt != nil {
+		return nil
+	}
+	// 支出のカテゴリのカウンタを定義
+	count := 0
+	// 既存カテゴリを回す
+	for _, e := range existing {
+		// eが自分自身またはアーカイブ済みなら飛ばす
+		if e.ID == c.ID || e.ArchivedAt != nil {
+			continue
+		}
+		// eの種類と名前が一緒なら名前重複のエラーを返す
+		if e.Name == c.Name && e.Kind == c.Kind {
+			return ValidationError{Field: "name", Message: "カテゴリ名が重複しています"}
+		}
+		// eの種類が支出ならカウンタを進める
+		if e.Kind == CategoryKindExpense {
+			count++
+		}
+	}
+	// cが支出かつ支出のカテゴリが上限超えている場合は上限超過のエラーを出す
+	if c.Kind == CategoryKindExpense && count >= MaxActiveExpenseCategories {
+		return ValidationError{Field: "kind", Message: "支出カテゴリ数の上限を超えています"}
+	}
+	return nil
 }
 
 // CheckKindUnchanged は更新で kind を変えようとしていないか検査する。変えようとしたら ValidationError（Field "kind"）。
 // current は保存済みのカテゴリ、in は更新リクエストの入力。
 func CheckKindUnchanged(current Category, in CategoryInput) error {
 	// TODO(L1): current.Kind と in.Kind を比べる。
-	panic("TODO(L1)")
+	if current.Kind != in.Kind {
+		return ValidationError{Field: "kind", Message: "カテゴリの種類（支出・収入）は変更できません"}
+	}
+	return nil
 }

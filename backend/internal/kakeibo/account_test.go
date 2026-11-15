@@ -7,8 +7,6 @@ import (
 )
 
 func TestAccountInputValidate(t *testing.T) {
-	t.Skip("TODO(L1): 実装したらこの行を消す")
-
 	tests := []struct {
 		name      string
 		in        AccountInput

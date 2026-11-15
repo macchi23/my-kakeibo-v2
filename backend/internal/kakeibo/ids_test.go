@@ -6,8 +6,6 @@ import (
 )
 
 func TestNewID(t *testing.T) {
-	t.Skip("TODO(L1): 実装したらこの行を消す")
-
 	a, b := NewID(), NewID()
 	if a == b {
 		t.Fatalf("NewID が重複した: %s", a)
@@ -23,8 +21,6 @@ func TestNewID(t *testing.T) {
 }
 
 func TestParseID(t *testing.T) {
-	t.Skip("TODO(L1): 実装したらこの行を消す")
-
 	const canonical = "018f3b0a-0000-7000-8000-000000000000"
 	tests := []struct {
 		name    string
@@ -66,8 +62,6 @@ func TestParseID(t *testing.T) {
 }
 
 func TestValidationErrorMessage(t *testing.T) {
-	t.Skip("TODO(L1): 実装したらこの行を消す")
-
 	tests := []struct {
 		name string
 		err  ValidationError

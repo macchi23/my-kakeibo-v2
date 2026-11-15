@@ -5,7 +5,9 @@
 package kakeibo
 
 import (
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type AccountKind string
@@ -44,6 +46,17 @@ type AccountInput struct {
 	SortOrder      int         `json:"sortOrder"`
 }
 
+// IsValid は k が定義済みの口座種別（BANK・CASH・CARD・E_MONEY・OTHER）のどれかなら true を返す。
+func (k AccountKind) IsValid() bool {
+	switch k {
+	case AccountKindBank, AccountKindCash, AccountKindCard, AccountKindEMoney, AccountKindOther:
+		// 有効な種別
+		return true
+	}
+	// 上記以外は全て無効な種別
+	return false
+}
+
 // Validate は入力を検証する。誤りは ValidationError で返す（Field は JSON のキー名）。
 //   - name: 前後の空白を除いて 1〜50 文字（バイト数ではなく rune 数）
 //   - kind: 上の定数のどれか
@@ -52,5 +65,12 @@ type AccountInput struct {
 func (in AccountInput) Validate() error {
 	// TODO(L1): name と kind を検査する。
 	//   ヒント: strings.TrimSpace / utf8.RuneCountInString / switch でも map でもよい（kind の判定）
-	panic("TODO(L1)")
+	n := utf8.RuneCountInString(strings.TrimSpace(in.Name))
+	if n < AccountNameMin || n > AccountNameMax {
+		return ValidationError{Field: "name", Message: "口座名は1-50文字にしてください"}
+	}
+	if !in.Kind.IsValid() {
+		return ValidationError{Field: "kind", Message: "口座種別の形式が正しくありません"}
+	}
+	return nil
 }
